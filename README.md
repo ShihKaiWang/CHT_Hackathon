@@ -1,4 +1,7 @@
 # 請執行以下在終端機上
+
+## Demo
+```bash
 git clone https://github.com/ShihKaiWang/CHT_Hackathon.git
 cd CHT_Hackathon
 git checkout feat/frontend-ui      # A 前端
