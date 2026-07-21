@@ -1,3 +1,13 @@
+# 請執行以下在終端機上
+git clone https://github.com/ShihKaiWang/CHT_Hackathon.git
+cd CHT_Hackathon
+git checkout feat/frontend-ui      # A 前端
+git checkout feat/backend-algo     # B 後端演算法
+git checkout feat/llm-rag          # C AI/LLM
+git checkout feat/integration      # D 整合
+
+
+
 # 城市應變分析 AI Agent 系統
 
 > 中華電信 2026 AI Hackathon — 智慧交通指揮 Dashboard
