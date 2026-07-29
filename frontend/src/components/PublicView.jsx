@@ -1,0 +1,236 @@
+import { useState, useEffect } from 'react'
+import VoiceBroadcast from './VoiceBroadcast'
+import MapRoutePlanner from './MapRoutePlanner'
+import PublicReport from './PublicReport'
+
+const CURRENT_INCIDENTS = [
+  {
+    id: 1,
+    title: '忠孝東路四段 道路塌陷',
+    status: '封閉中',
+    severity: 'critical',
+    location: '延吉街至光復南路段',
+    since: '14:32',
+    ete: '35 分鐘',
+    recovery: '15:07',
+  },
+  {
+    id: 2,
+    title: '信義路/復興南路口 施工',
+    status: '佔用一車道',
+    severity: 'warning',
+    location: '外側車道封閉',
+    since: '09:00',
+    ete: '持續至 18:00',
+    recovery: '18:00',
+  },
+]
+
+const ALTERNATIVE_ROUTES = [
+  {
+    id: 1,
+    from: '忠孝東路方向',
+    suggestion: '改走仁愛路四段',
+    extra_time: '+5 分鐘',
+    congestion: '順暢',
+    congestion_color: 'green',
+  },
+  {
+    id: 2,
+    from: '忠孝東路方向',
+    suggestion: '改走市民大道四段',
+    extra_time: '+8 分鐘',
+    congestion: '稍塞',
+    congestion_color: 'amber',
+  },
+  {
+    id: 3,
+    from: '光復南路方向',
+    suggestion: '改走大安路一段',
+    extra_time: '+3 分鐘',
+    congestion: '順暢',
+    congestion_color: 'green',
+  },
+]
+
+const NEARBY_TRANSIT = [
+  { type: '🚇', name: '忠孝復興站（板南線）', distance: '350m', status: '正常營運' },
+  { type: '🚇', name: '國父紀念館站（板南線）', distance: '400m', status: '正常營運' },
+  { type: '🚌', name: '212 路公車', distance: '路口', status: '臨時改道仁愛路' },
+  { type: '🚌', name: '232 路公車', distance: '路口', status: '臨時改道仁愛路' },
+]
+
+function PublicView() {
+  const [currentTime, setCurrentTime] = useState(new Date())
+  const [activeSection, setActiveSection] = useState('info') // info | route | report
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-4">
+      {/* Header — 手機風格 */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-5 text-white shadow-lg">
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="text-lg font-bold">🚦 台北即時路況</h1>
+          <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
+            {currentTime.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        </div>
+        <p className="text-sm text-blue-100">信義區 · 大安區 即時交通資訊</p>
+        <div className="flex items-center gap-2 mt-3">
+          <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+          <span className="text-xs text-blue-200">即時更新中</span>
+        </div>
+      </div>
+
+      {/* 功能切換 Tab */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setActiveSection('info')}
+          className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+            activeSection === 'info' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-800 text-slate-400 border border-slate-700'
+          }`}
+        >
+          📍 即時路況
+        </button>
+        <button
+          onClick={() => setActiveSection('route')}
+          className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+            activeSection === 'route' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-800 text-slate-400 border border-slate-700'
+          }`}
+        >
+          🚌 路線規劃
+        </button>
+        <button
+          onClick={() => setActiveSection('report')}
+          className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+            activeSection === 'report' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-800 text-slate-400 border border-slate-700'
+          }`}
+        >
+          📢 我要回報
+        </button>
+      </div>
+
+      {/* 路線規劃 */}
+      {activeSection === 'route' && <MapRoutePlanner />}
+
+      {/* 公眾回報 */}
+      {activeSection === 'report' && <PublicReport />}
+
+      {/* 即時路況（原本內容） */}
+      {activeSection === 'info' && (
+      <div className="space-y-4">
+
+      {/* 語音播報 */}
+      <VoiceBroadcast />
+
+      {/* 目前事件 */}
+      <div className="space-y-3">
+        <h2 className="text-base font-semibold text-white px-1">⚠️ 目前事件</h2>
+        {CURRENT_INCIDENTS.map((incident) => (
+          <div
+            key={incident.id}
+            className={`rounded-xl p-4 border ${
+              incident.severity === 'critical'
+                ? 'bg-red-500/10 border-red-500/30'
+                : 'bg-amber-500/10 border-amber-500/30'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-bold text-white">{incident.title}</h3>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                incident.severity === 'critical'
+                  ? 'bg-red-500 text-white'
+                  : 'bg-amber-500 text-black'
+              }`}>
+                {incident.status}
+              </span>
+            </div>
+            <div className="space-y-1 text-sm text-slate-300">
+              <p>📍 {incident.location}</p>
+              <p>🕐 發生時間：{incident.since}</p>
+              <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-700">
+                <span className="text-xs">⏱️ 預計恢復：<strong className="text-white">{incident.recovery}</strong></span>
+                <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">
+                  剩餘約 {incident.ete}
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 替代路線建議 */}
+      <div className="space-y-3">
+        <h2 className="text-base font-semibold text-white px-1">🛤️ 建議替代路線</h2>
+        {ALTERNATIVE_ROUTES.map((route) => (
+          <div key={route.id} className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-slate-400">{route.from}</p>
+                <p className="text-sm text-white font-medium mt-0.5">👉 {route.suggestion}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-bold text-amber-400">{route.extra_time}</p>
+                <p className={`text-xs mt-0.5 ${
+                  route.congestion_color === 'green' ? 'text-green-400' : 'text-amber-400'
+                }`}>
+                  ● {route.congestion}
+                </p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 附近大眾運輸 */}
+      <div className="space-y-3">
+        <h2 className="text-base font-semibold text-white px-1">🚇 附近大眾運輸</h2>
+        <div className="bg-slate-800 border border-slate-700 rounded-xl divide-y divide-slate-700">
+          {NEARBY_TRANSIT.map((transit, i) => (
+            <div key={i} className="p-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-xl">{transit.type}</span>
+                <div>
+                  <p className="text-sm text-white">{transit.name}</p>
+                  <p className="text-xs text-slate-400">{transit.distance}</p>
+                </div>
+              </div>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                transit.status === '正常營運'
+                  ? 'bg-green-500/20 text-green-400'
+                  : 'bg-amber-500/20 text-amber-400'
+              }`}>
+                {transit.status}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 安全提醒 */}
+      <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
+        <h3 className="text-sm font-medium text-blue-400 mb-2">💡 安全提醒</h3>
+        <ul className="space-y-1 text-xs text-slate-300">
+          <li>• 請遠離塌陷區域，注意施工圍籬</li>
+          <li>• 步行者建議使用仁愛路地下道通行</li>
+          <li>• 行動不便者可撥打 1999 市民熱線求助</li>
+          <li>• 最新資訊請關注台北市交通局官方公告</li>
+        </ul>
+      </div>
+
+      {/* 底部 */}
+      <div className="text-center text-xs text-slate-500 py-4">
+        <p>城市應變分析 AI Agent — 中華電信 2026 AI Hackathon</p>
+        <p className="mt-1">資料每 30 秒自動更新 · 最後更新 {currentTime.toLocaleTimeString('zh-TW')}</p>
+      </div>
+      </div>
+      )}
+    </div>
+  )
+}
+
+export default PublicView
