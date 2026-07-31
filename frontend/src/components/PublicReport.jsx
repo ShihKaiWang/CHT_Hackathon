@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSimClock } from '../hooks/useSimClock.jsx'
 
 const REPORT_TYPES = [
   { id: 'traffic_jam', icon: '🚗', label: '塞車', color: 'red' },
@@ -17,7 +18,7 @@ const SEVERITY_OPTIONS = [
   { id: 'high', label: '嚴重', desc: '道路嚴重阻塞或封閉', color: 'red' },
 ]
 
-// 模擬已有的民眾回報
+// 模擬已有的民眾回報（時間對齊真實事件 22:10 之後）
 const EXISTING_REPORTS = [
   {
     id: 'R001',
@@ -26,31 +27,31 @@ const EXISTING_REPORTS = [
     location: '忠孝東路/光復南路口',
     description: '雙向都塞住了，完全不動',
     severity: 'high',
-    time: '14:28',
+    time: '22:12',
     upvotes: 23,
     status: 'confirmed',
     reporter: '匿名市民',
   },
   {
     id: 'R002',
-    type: 'flood',
-    icon: '🌊',
-    location: '市民大道地下道入口',
-    description: '積水大概到小腿，機車無法通過',
+    type: 'road_damage',
+    icon: '🕳️',
+    location: '光復南路南側',
+    description: '路面塌陷很大一塊，有車掉進去',
     severity: 'high',
-    time: '14:15',
+    time: '22:15',
     upvotes: 15,
     status: 'processing',
     reporter: '路過騎士',
   },
   {
     id: 'R003',
-    type: 'road_damage',
-    icon: '🕳️',
-    location: '大安路一段 近仁愛路口',
-    description: '路面有個大坑洞，機車要小心',
-    severity: 'medium',
-    time: '13:50',
+    type: 'traffic_jam',
+    icon: '🚗',
+    location: '基隆路一段/忠孝東路口',
+    description: '完全堵死，動彈不得已經 20 分鐘',
+    severity: 'high',
+    time: '22:20',
     upvotes: 8,
     status: 'confirmed',
     reporter: '通勤族',
@@ -59,10 +60,10 @@ const EXISTING_REPORTS = [
     id: 'R004',
     type: 'signal_broken',
     icon: '🚦',
-    location: '復興南路/市民大道口',
-    description: '紅綠燈一直閃黃燈',
+    location: '信義威秀/ATT4FUN 周邊',
+    description: '好幾個路口紅綠燈都不亮',
     severity: 'medium',
-    time: '13:30',
+    time: '22:32',
     upvotes: 12,
     status: 'dispatched',
     reporter: '附近住戶',
@@ -71,10 +72,10 @@ const EXISTING_REPORTS = [
     id: 'R005',
     type: 'traffic_jam',
     icon: '🚗',
-    location: '仁愛路四段 東向',
-    description: '可能是忠孝東路塞車分流過來的',
+    location: '市民大道四段 東向',
+    description: '可能是光復南路封路分流過來的車',
     severity: 'medium',
-    time: '14:35',
+    time: '22:35',
     upvotes: 6,
     status: 'new',
     reporter: '公車乘客',
@@ -98,6 +99,10 @@ function PublicReport() {
   const [description, setDescription] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [filter, setFilter] = useState('all')
+  const { currentTime } = useSimClock()
+
+  // 只顯示模擬時鐘時間之前的回報
+  const timeFilteredReports = reports.filter((r) => r.time <= currentTime)
 
   function handleSubmit(e) {
     e.preventDefault()
@@ -110,7 +115,7 @@ function PublicReport() {
       location,
       description,
       severity,
-      time: new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }),
+      time: currentTime,
       upvotes: 1,
       status: 'new',
       reporter: '你',
@@ -135,12 +140,12 @@ function PublicReport() {
   }
 
   const filteredReports = filter === 'all'
-    ? reports
-    : reports.filter((r) => r.severity === filter)
+    ? timeFilteredReports
+    : timeFilteredReports.filter((r) => r.severity === filter)
 
-  const totalReports = reports.length
-  const confirmedCount = reports.filter((r) => r.status === 'confirmed' || r.status === 'dispatched').length
-  const highSeverityCount = reports.filter((r) => r.severity === 'high').length
+  const totalReports = timeFilteredReports.length
+  const confirmedCount = timeFilteredReports.filter((r) => r.status === 'confirmed' || r.status === 'dispatched').length
+  const highSeverityCount = timeFilteredReports.filter((r) => r.severity === 'high').length
 
   return (
     <div className="space-y-6">
@@ -174,7 +179,7 @@ function PublicReport() {
             <p className="text-xs text-slate-400">嚴重事件</p>
           </div>
           <div className="bg-slate-700/50 rounded-lg p-3 text-center">
-            <p className="text-xl font-bold text-amber-400">{reports.reduce((sum, r) => sum + r.upvotes, 0)}</p>
+            <p className="text-xl font-bold text-amber-400">{timeFilteredReports.reduce((sum, r) => sum + r.upvotes, 0)}</p>
             <p className="text-xs text-slate-400">總附議數</p>
           </div>
         </div>

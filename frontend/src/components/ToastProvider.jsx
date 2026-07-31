@@ -92,9 +92,6 @@ export function ToastProvider({ children }) {
                 <span className="text-lg flex-shrink-0">{style.icon}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-white font-medium leading-snug">{toast.message}</p>
-                  <p className={`text-xs mt-1 ${style.text}`}>
-                    {new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                  </p>
                 </div>
                 <button
                   onClick={() => removeToast(toast.id)}

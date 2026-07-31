@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { MapContainer, TileLayer, Polyline, Circle, Marker, Popup, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
+import { useSimClock } from '../hooks/useSimClock.jsx'
 
 // 修正 Leaflet 預設 marker icon 路徑問題
 delete L.Icon.Default.prototype._getIconUrl
@@ -115,16 +116,21 @@ function PulseMarker({ position, color, size = 200 }) {
 }
 
 function TrafficMap() {
+  const { currentTime } = useSimClock()
+  const eventStarted = currentTime >= '22:10'
+
   return (
     <div className="card-glass rounded-lg p-4">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-lg font-semibold text-white">🗺️ 即時路網態勢圖</h2>
+        {eventStarted && (
         <div className="flex gap-3 text-xs">
           <span className="flex items-center gap-1"><span className="w-3 h-1 bg-red-500 rounded"></span> 封閉路段</span>
           <span className="flex items-center gap-1"><span className="w-3 h-1 bg-green-500 rounded"></span> 替代路線</span>
           <span className="flex items-center gap-1"><span className="w-3 h-1 bg-amber-500 rounded"></span> 受影響</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-cyan-400/50"></span> 基地台覆蓋</span>
         </div>
+        )}
       </div>
 
       <div className="rounded-lg overflow-hidden border border-slate-700" style={{ height: '480px' }}>
@@ -146,6 +152,8 @@ function TrafficMap() {
           />
 
           {/* 封閉路段（紅色粗虛線） */}
+          {eventStarted && (
+          <>
           <Polyline
             positions={ZHONGXIAO_ROAD}
             pathOptions={{ color: '#dc2626', weight: 8, dashArray: '12, 8', opacity: 0.95 }}
@@ -260,10 +268,13 @@ function TrafficMap() {
               </Popup>
             </Marker>
           ))}
+          </>
+          )}
         </MapContainer>
       </div>
 
       {/* 地圖下方說明 */}
+      {eventStarted && (
       <div className="mt-3 grid grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
         <div className="bg-red-500/10 border border-red-500/20 rounded p-2">
           <p className="text-red-400 font-medium">封閉路段</p>
@@ -282,6 +293,7 @@ function TrafficMap() {
           <p className="text-slate-400">綠燈延長/左轉相位</p>
         </div>
       </div>
+      )}
 
       {/* CSS for pulse animation */}
       <style>{`

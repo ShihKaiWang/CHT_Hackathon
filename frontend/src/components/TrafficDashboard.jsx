@@ -5,6 +5,7 @@ import {
 } from 'recharts'
 import { fetchTrafficData } from '../services/api'
 import { useCountUp } from '../hooks/useCountUp'
+import { useSimClock } from '../hooks/useSimClock.jsx'
 
 const SATURATION_COLORS = {
   critical: '#ef4444',
@@ -20,19 +21,19 @@ function AnimatedNumber({ value, suffix = '', decimals = 0, className = '' }) {
 }
 
 const ROAD_COLORS = {
-  '路段A_忠孝東路': '#3b82f6',
-  '路段B_中山北路': '#8b5cf6',
-  '路段C_信義路': '#06b6d4',
-  '路段D_民權東路': '#f59e0b',
-  '路段E_復興南路': '#10b981',
+  '路段A_忠孝東路四段': '#3b82f6',
+  '路段B_光復南路': '#8b5cf6',
+  '路段C_基隆路一段': '#06b6d4',
+  '路段D_敦化南路一段': '#f59e0b',
+  '路段E_市民大道四段': '#10b981',
 }
 
 const ROAD_LABELS = {
-  '路段A_忠孝東路': '忠孝東路',
-  '路段B_中山北路': '中山北路',
-  '路段C_信義路': '信義路',
-  '路段D_民權東路': '民權東路',
-  '路段E_復興南路': '復興南路',
+  '路段A_忠孝東路四段': '忠孝東路四段',
+  '路段B_光復南路': '光復南路',
+  '路段C_基隆路一段': '基隆路一段',
+  '路段D_敦化南路一段': '敦化南路一段',
+  '路段E_市民大道四段': '市民大道四段',
 }
 
 const MEDAL = ['🥇', '🥈', '🥉', '4', '5']
@@ -86,36 +87,11 @@ function TrafficDashboard() {
   const [flowData, setFlowData] = useState([])
   const [saturationData, setSaturationData] = useState([])
   const [loading, setLoading] = useState(true)
-  const [currentHour, setCurrentHour] = useState(0)
-  const [liveMode, setLiveMode] = useState(true)
-  const intervalRef = useRef(null)
+  const { currentTime, currentIndex } = useSimClock()
 
   useEffect(() => {
     loadData()
   }, [])
-
-  // 即時模式：每 3 秒推進一個小時的數據
-  useEffect(() => {
-    if (liveMode && flowData.length > 0) {
-      intervalRef.current = setInterval(() => {
-        setCurrentHour((prev) => (prev + 1) % flowData.length)
-        // 模擬飽和度微幅變動
-        setSaturationData((prev) =>
-          prev.map((item) => ({
-            ...item,
-            saturation: Math.min(1, Math.max(0.3, item.saturation + (Math.random() - 0.48) * 0.03)),
-            status:
-              item.saturation + (Math.random() - 0.48) * 0.03 > 0.9
-                ? 'critical'
-                : item.saturation + (Math.random() - 0.48) * 0.03 > 0.85
-                ? 'warning'
-                : 'normal',
-          }))
-        )
-      }, 3000)
-    }
-    return () => clearInterval(intervalRef.current)
-  }, [liveMode, flowData])
 
   async function loadData() {
     try {
@@ -137,11 +113,11 @@ function TrafficDashboard() {
     )
   }
 
-  // 顯示到 currentHour 為止的資料（模擬即時推進）
-  const visibleFlowData = flowData.slice(0, currentHour + 1)
-  const criticalCount = saturationData.filter((d) => d.saturation > 0.9).length
-  const warningCount = saturationData.filter((d) => d.saturation > 0.85 && d.saturation <= 0.9).length
-  const maxSaturation = Math.max(...saturationData.map((d) => d.saturation))
+  // 依模擬時鐘決定顯示到哪個時間點
+  const visibleFlowData = flowData.slice(0, currentIndex + 1)
+  const criticalCount = saturationData.filter((d) => d.saturation >= 0.95).length
+  const warningCount = saturationData.filter((d) => d.saturation >= 0.85 && d.saturation < 0.95).length
+  const maxSaturation = saturationData.length > 0 ? Math.max(...saturationData.map((d) => d.saturation)) : 0
 
   return (
     <div className="space-y-6">
@@ -173,22 +149,7 @@ function TrafficDashboard() {
       <div className="card-glass rounded-lg p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-white">📊 車流量時序監測</h2>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setLiveMode(!liveMode)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
-                liveMode
-                  ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                  : 'bg-slate-700 text-slate-400 border border-slate-600'
-              }`}
-            >
-              {liveMode && <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>}
-              {liveMode ? 'LIVE' : '暫停'}
-            </button>
-            <span className="text-xs text-slate-500">
-              {flowData[currentHour]?.time || '--:--'}
-            </span>
-          </div>
+          <span className="text-xs text-slate-500 font-mono">{currentTime}</span>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* 折線圖（佔 2/3） */}
@@ -203,11 +164,11 @@ function TrafficDashboard() {
                   labelStyle={{ color: '#e2e8f0' }}
                 />
                 <Legend />
-                <Line type="monotone" dataKey="路段A_忠孝東路" stroke="#3b82f6" strokeWidth={2} dot={false} animationDuration={500} />
-                <Line type="monotone" dataKey="路段B_中山北路" stroke="#8b5cf6" strokeWidth={2} dot={false} animationDuration={500} />
-                <Line type="monotone" dataKey="路段C_信義路" stroke="#06b6d4" strokeWidth={2} dot={false} animationDuration={500} />
-                <Line type="monotone" dataKey="路段D_民權東路" stroke="#f59e0b" strokeWidth={1.5} dot={false} animationDuration={500} />
-                <Line type="monotone" dataKey="路段E_復興南路" stroke="#10b981" strokeWidth={1.5} dot={false} animationDuration={500} />
+                <Line type="monotone" dataKey="路段A_忠孝東路四段" stroke="#3b82f6" strokeWidth={2} dot={false} animationDuration={500} />
+                <Line type="monotone" dataKey="路段B_光復南路" stroke="#8b5cf6" strokeWidth={2} dot={false} animationDuration={500} />
+                <Line type="monotone" dataKey="路段C_基隆路一段" stroke="#06b6d4" strokeWidth={2} dot={false} animationDuration={500} />
+                <Line type="monotone" dataKey="路段D_敦化南路一段" stroke="#f59e0b" strokeWidth={1.5} dot={false} animationDuration={500} />
+                <Line type="monotone" dataKey="路段E_市民大道四段" stroke="#10b981" strokeWidth={1.5} dot={false} animationDuration={500} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -215,7 +176,7 @@ function TrafficDashboard() {
           {/* 即時車流排名（佔 1/3） */}
           <div className="flex flex-col justify-center">
             <h3 className="text-sm font-medium text-slate-300 mb-3">🏆 即時車流 TOP 5</h3>
-            <FlowRanking data={flowData[currentHour]} />
+            <FlowRanking data={flowData[currentIndex]} />
           </div>
         </div>
       </div>

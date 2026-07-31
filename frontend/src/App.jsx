@@ -20,6 +20,8 @@ import PublicReport from './components/PublicReport'
 import CitizenSMS from './components/CitizenSMS'
 import SecurityModule from './components/SecurityModule'
 import HumanOverride from './components/HumanOverride'
+import SimClockBar from './components/SimClockBar'
+import { useSimClock } from './hooks/useSimClock.jsx'
 import { useToast } from './components/ToastProvider'
 
 // 5 大主頁面
@@ -59,6 +61,14 @@ function App() {
   const [loginError, setLoginError] = useState('')
   const [weatherEnabled, setWeatherEnabled] = useState(false)
   const { addToast } = useToast()
+  const { setOnEvent } = useSimClock()
+
+  // 模擬時鐘事件觸發 → 彈 Toast
+  useEffect(() => {
+    setOnEvent((event) => {
+      addToast(`[${event.time}] ${event.message}`, 'critical')
+    })
+  }, [setOnEvent, addToast])
 
   const PASSWORDS = { commander: '1234', public: '' }
   const ROLE_INFO = {
@@ -88,25 +98,6 @@ function App() {
     setLoginPassword('')
     setPublicMode(false)
   }
-
-  // 模擬即時預警 Toast
-  useEffect(() => {
-    const alerts = [
-      { msg: '忠孝東路四段飽和度已達 92%，超出閾值！', level: 'critical' },
-      { msg: '南京東路四段飽和度 91%，建議啟動疏導', level: 'critical' },
-      { msg: '台北 101 周邊人流異常升高，漫遊率 35%', level: 'warning' },
-      { msg: '信義路/復興南路口施工佔用一車道', level: 'warning' },
-      { msg: 'AI 已完成替代路徑計算（2 條路線）', level: 'success' },
-      { msg: '多語通報已送出（CBS + SMS + 看板）', level: 'info' },
-    ]
-    let index = 0
-    const initialTimer = setTimeout(() => { addToast(alerts[0].msg, alerts[0].level); index = 1 }, 5000)
-    const interval = setInterval(() => {
-      if (index < alerts.length) { addToast(alerts[index].msg, alerts[index].level); index++ }
-      else { index = 0 }
-    }, 15000)
-    return () => { clearTimeout(initialTimer); clearInterval(interval) }
-  }, [addToast])
 
   // 切換 Tab 時滾動到頂部
   useEffect(() => {
@@ -253,6 +244,9 @@ function App() {
       <div className="status-bar">
         <StatusBar />
       </div>
+
+      {/* 模擬時鐘控制列 */}
+      <SimClockBar />
 
       {/* Header */}
       <header className={`bg-slate-800 border-b border-slate-700 px-6 py-3 transition-all duration-300 ${fullscreen ? 'hidden' : ''}`}>

@@ -4,6 +4,7 @@ import NotificationDispatch from './NotificationDispatch'
 import AffectedAreaMap from './AffectedAreaMap'
 import DispatchStatus from './DispatchStatus'
 import { dispatchHistory, evacuationRoutes } from '../services/mockData'
+import { useSimClock } from '../hooks/useSimClock.jsx'
 
 const LANG_LABELS = {
   zh: { name: '中文', flag: '🇹🇼' },
@@ -17,6 +18,10 @@ function MultiLangReport() {
   const [selectedLang, setSelectedLang] = useState('zh')
   const [loading, setLoading] = useState(true)
   const [dispatchedChannels, setDispatchedChannels] = useState([])
+  const { currentTime } = useSimClock()
+
+  // 通報只有事件發生後（22:10+）才顯示
+  const eventTriggered = currentTime >= '22:10'
 
   useEffect(() => {
     loadReport()
@@ -46,6 +51,18 @@ function MultiLangReport() {
   }
 
   if (!report) return null
+
+  if (!eventTriggered) {
+    return (
+      <div className="card-glass rounded-lg p-8 text-center">
+        <span className="text-4xl block mb-3">📡</span>
+        <h2 className="text-lg font-bold text-white">通報發佈</h2>
+        <p className="text-sm text-slate-400 mt-2">目前尚無事件觸發通報。</p>
+        <p className="text-xs text-slate-500 mt-1">當事件發生且漫遊率 ≥ 30% 時，系統將自動產出多語通報。</p>
+        <p className="text-xs text-slate-600 mt-3 font-mono">模擬時間：{currentTime} ｜ 等待事件觸發...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

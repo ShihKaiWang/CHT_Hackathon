@@ -1,59 +1,60 @@
 import { useState } from 'react'
+import { useSimClock } from '../hooks/useSimClock.jsx'
 
-// AI 產出的決策（等待人類審核）
+// AI 產出的決策（事件 22:10 發生後由 AI 產出）
 const AI_DECISIONS = [
   {
     id: 'DEC-001',
-    time: '14:32:15',
+    time: '22:10',
     category: '路線規劃',
-    aiSuggestion: '封閉忠孝東路四段，啟動仁愛路分流',
-    reasoning: 'SOP 第 2 條：飽和度 92% > 90%，影響路段 ≥ 3',
-    confidence: 92,
-    impact: '影響約 4,200 輛車/時',
+    aiSuggestion: '封閉光復南路南下全線，啟動市民大道/仁愛路分流',
+    reasoning: 'SOP 第 2 條：光復南路塌陷 Saturation 1.00，完全阻斷',
+    confidence: 95,
+    impact: '影響約 1,800 輛車/時',
     urgency: 'high',
-    status: 'pending', // pending / approved / overridden / rejected
+    status: 'pending',
   },
   {
     id: 'DEC-002',
-    time: '14:32:18',
+    time: '22:10',
     category: '號誌調整',
-    aiSuggestion: '忠孝/復興路口南北向綠燈 +25%（40s→50s）',
-    reasoning: '疏散南向車流需求，避免上游回堵',
-    confidence: 88,
-    impact: '東西向等待時間增加 10 秒',
+    aiSuggestion: '市民大道/光復南路口綠燈配時 +25%',
+    reasoning: 'SOP 第 1 條：替代道路綠燈延長，疏散上游車流',
+    confidence: 90,
+    impact: '東西向等待時間增加 8 秒',
     urgency: 'high',
     status: 'pending',
   },
   {
     id: 'DEC-003',
-    time: '14:32:20',
-    category: '號誌調整',
-    aiSuggestion: '仁愛/大安路口增設東向左轉相位 10s',
-    reasoning: '分流車輛需左轉進入大安路',
-    confidence: 85,
-    impact: '該路口每週期減少直行 10 秒',
-    urgency: 'medium',
+    time: '22:20',
+    category: '跨系統聯動',
+    aiSuggestion: '通知北捷過站不停，調度接駁專車至 BL18',
+    reasoning: 'SOP 第 3 條：BL17 Growth_Rate > 0.30，User_Count > 25,000',
+    confidence: 92,
+    impact: '捷運站人流需立即疏散',
+    urgency: 'high',
     status: 'pending',
   },
   {
     id: 'DEC-004',
-    time: '14:32:25',
+    time: '22:20',
     category: '通報發送',
-    aiSuggestion: '發送 CBS 四語緊急通報至 BL17 基地台範圍',
-    reasoning: 'SOP 第 6 條：漫遊率 35% ≥ 30%，觸發多語通報',
-    confidence: 95,
-    impact: '約 4,200 人收到警報',
+    aiSuggestion: '發送多語緊急通報（台北101廣場漫遊率 40%）',
+    reasoning: 'SOP 第 6 條：Roaming_User_Pct 40% ≥ 30%，觸發多語通報',
+    confidence: 99,
+    impact: '約 9,500 人收到警報',
     urgency: 'high',
     status: 'pending',
   },
   {
     id: 'DEC-005',
-    time: '14:32:30',
-    category: '跨系統聯動',
-    aiSuggestion: '通知北捷板南線忠孝復興站加開列車',
-    reasoning: 'SOP 第 3 條：重大事件需跨系統協調',
-    confidence: 82,
-    impact: '增加營運成本，但可吸收地面轉乘需求',
+    time: '22:30',
+    category: '號誌調整',
+    aiSuggestion: '信義威秀周邊派遣人工指揮（每路口 2 人）',
+    reasoning: 'SOP 第 5 條：號誌故障，需改由人工交通指揮',
+    confidence: 88,
+    impact: '影響 3 個路口',
     urgency: 'medium',
     status: 'pending',
   },
@@ -71,7 +72,11 @@ function HumanOverride() {
   const [overrideModal, setOverrideModal] = useState(null)
   const [overrideReason, setOverrideReason] = useState('')
   const [overrideAction, setOverrideAction] = useState('')
-  const [mode, setMode] = useState('review') // review | auto
+  const [mode, setMode] = useState('review')
+  const { currentTime } = useSimClock()
+
+  // 依模擬時鐘過濾：只顯示 time <= currentTime 的決策
+  const visibleDecisions = decisions.filter((d) => d.time <= currentTime)
 
   function handleApprove(id) {
     setDecisions((prev) =>
@@ -115,10 +120,10 @@ function HumanOverride() {
     return new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   }
 
-  const pending = decisions.filter((d) => d.status === 'pending')
-  const approved = decisions.filter((d) => d.status === 'approved')
-  const overridden = decisions.filter((d) => d.status === 'overridden')
-  const rejected = decisions.filter((d) => d.status === 'rejected')
+  const pending = visibleDecisions.filter((d) => d.status === 'pending')
+  const approved = visibleDecisions.filter((d) => d.status === 'approved')
+  const overridden = visibleDecisions.filter((d) => d.status === 'overridden')
+  const rejected = visibleDecisions.filter((d) => d.status === 'rejected')
 
   return (
     <div className="space-y-6">
@@ -259,7 +264,7 @@ function HumanOverride() {
         <div className="card-glass rounded-lg p-6">
           <h3 className="text-lg font-semibold text-white mb-4">📋 決策處理紀錄</h3>
           <div className="space-y-2">
-            {decisions.filter((d) => d.status !== 'pending').map((decision) => (
+            {visibleDecisions.filter((d) => d.status !== 'pending').map((decision) => (
               <div key={decision.id} className={`p-3 rounded-lg border ${
                 decision.status === 'approved' ? 'border-green-500/20 bg-green-500/5' :
                 decision.status === 'overridden' ? 'border-blue-500/20 bg-blue-500/5' :

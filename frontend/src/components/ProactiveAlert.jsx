@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useSimClock } from '../hooks/useSimClock.jsx'
 
 // AI 巡邏思考 log
 const AI_THOUGHTS = [
@@ -97,31 +98,61 @@ const TYPE_COLORS = { scan: 'text-slate-400', analyze: 'text-blue-400', predict:
 function ProactiveAlert() {
   const [agentLogs, setAgentLogs] = useState([])
   const [agentRunning, setAgentRunning] = useState(false)
-  const [logIndex, setLogIndex] = useState(0)
+  const [predictions, setPredictions] = useState(PREDICTIVE_ALERTS)
+  const [anomalies, setAnomalies] = useState(ANOMALY_DETECTIONS)
   const [alertExpanded, setAlertExpanded] = useState(null)
   const [actionsTaken, setActionsTaken] = useState(new Set())
   const logEndRef = useRef(null)
   const timerRef = useRef(null)
+  const { currentTime } = useSimClock()
 
-  // AI Agent 自動巡邏
+  // AI Agent 巡邏 — 從後端取得真實結果
   useEffect(() => {
     if (!agentRunning) return
-    timerRef.current = setInterval(() => {
-      setLogIndex((prev) => (prev + 1) % AI_THOUGHTS.length)
-    }, 2500)
+
+    // 啟動時立即巡邏一次
+    runPatrol()
+
+    // 之後每 30 秒巡邏
+    timerRef.current = setInterval(runPatrol, 30000)
     return () => clearInterval(timerRef.current)
   }, [agentRunning])
 
-  useEffect(() => {
-    const thought = AI_THOUGHTS[logIndex]
-    if (!thought) return
-    const newLog = {
-      ...thought,
-      timestamp: new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      id: Date.now(),
+  async function runPatrol() {
+    try {
+      const res = await fetch('/api/dashboard/agent-patrol')
+      const data = await res.json()
+
+      // 逐步顯示 thoughts（每 2 秒一條）
+      if (data.thoughts) {
+        data.thoughts.forEach((thought, i) => {
+          setTimeout(() => {
+            setAgentLogs((prev) => [...prev.slice(-25), {
+              ...thought,
+              timestamp: currentTime,
+              id: Date.now() + i,
+            }])
+          }, i * 2000)
+        })
+      }
+
+      // 更新預測和異常
+      if (data.predictions?.length) setPredictions(data.predictions)
+      if (data.anomalies?.length) setAnomalies(data.anomalies)
+    } catch (err) {
+      // API 失敗時用本地模擬
+      fallbackLocalPatrol()
     }
-    setAgentLogs((prev) => [...prev.slice(-25), newLog])
-  }, [logIndex])
+  }
+
+  function fallbackLocalPatrol() {
+    const thought = AI_THOUGHTS[Math.floor(Math.random() * AI_THOUGHTS.length)]
+    setAgentLogs((prev) => [...prev.slice(-25), {
+      ...thought,
+      timestamp: currentTime,
+      id: Date.now(),
+    }])
+  }
 
   useEffect(() => {
     // 只在 log 容器內部滾動，不影響頁面滾動位置
@@ -218,7 +249,7 @@ function ProactiveAlert() {
         </div>
 
         <div className="space-y-3">
-          {PREDICTIVE_ALERTS.map((alert) => {
+          {predictions.map((alert) => {
             const isExpanded = alertExpanded === alert.id
             const isHandled = actionsTaken.has(alert.id)
 
@@ -323,15 +354,15 @@ function ProactiveAlert() {
         </div>
 
         {/* 一鍵全部處理 */}
-        {actionsTaken.size < PREDICTIVE_ALERTS.length && (
+        {actionsTaken.size < predictions.length && (
           <button
-            onClick={() => setActionsTaken(new Set(PREDICTIVE_ALERTS.map((a) => a.id)))}
+            onClick={() => setActionsTaken(new Set(predictions.map((a) => a.id)))}
             className="mt-4 w-full py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold rounded-lg shadow-lg shadow-green-500/20 transition-all"
           >
             🛡️ 一鍵採納所有預防建議
           </button>
         )}
-        {actionsTaken.size === PREDICTIVE_ALERTS.length && (
+        {actionsTaken.size === predictions.length && (
           <div className="mt-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-center">
             <p className="text-sm text-green-400 font-medium">✅ 所有預測性風險已提前介入處理</p>
           </div>

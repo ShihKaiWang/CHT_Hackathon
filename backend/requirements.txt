@@ -1,0 +1,9 @@
+fastapi==0.115.6
+uvicorn==0.34.0
+pandas==2.2.3
+python-dotenv==1.0.1
+websockets==14.1
+pydantic==2.10.3
+boto3==1.35.81
+langchain==0.3.13
+langchain-aws==0.2.10

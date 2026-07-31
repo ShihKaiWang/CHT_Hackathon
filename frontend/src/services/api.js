@@ -9,7 +9,7 @@ import {
 } from './mockData'
 
 const API_BASE = '/api'
-const USE_MOCK = true // 切換為 false 以連接真實後端
+const USE_MOCK = false // 切換為 false 以連接真實後端
 
 const api = axios.create({
   baseURL: API_BASE,

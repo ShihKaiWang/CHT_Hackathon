@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { fetchAlerts, connectWebSocket } from '../services/api'
+import { useSimClock } from '../hooks/useSimClock.jsx'
 
 const LEVEL_STYLES = {
   critical: 'border-red-500 bg-red-500/10 glow-red',
@@ -20,39 +21,51 @@ const LEVEL_ICON = {
 }
 
 function AlertList() {
-  const [alerts, setAlerts] = useState([])
+  const [allAlerts, setAllAlerts] = useState([])
   const [loading, setLoading] = useState(true)
   const [newAlertIds, setNewAlertIds] = useState(new Set())
   const listRef = useRef(null)
+  const { currentTime } = useSimClock()
+  const prevCountRef = useRef(0)
 
   useEffect(() => {
     loadAlerts()
-    const ws = connectWebSocket((newAlert) => {
-      setAlerts((prev) => [newAlert, ...prev].slice(0, 20))
-      // 標記為新告警（觸發滑入動畫）
-      setNewAlertIds((prev) => new Set([...prev, newAlert.id]))
-      // 3 秒後移除「新」標記
-      setTimeout(() => {
-        setNewAlertIds((prev) => {
-          const next = new Set(prev)
-          next.delete(newAlert.id)
-          return next
-        })
-      }, 3000)
-    })
-    return () => ws.close()
   }, [])
 
   async function loadAlerts() {
     try {
       const data = await fetchAlerts()
-      setAlerts(data)
+      setAllAlerts(data)
     } catch (err) {
       console.error('載入告警失敗:', err)
     } finally {
       setLoading(false)
     }
   }
+
+  // 依模擬時鐘過濾：只顯示 time <= currentTime 的告警
+  const alerts = allAlerts.filter((alert) => alert.time <= currentTime)
+
+  // 偵測新增告警（時鐘推進時新出現的）
+  useEffect(() => {
+    if (alerts.length > prevCountRef.current) {
+      const newOnes = alerts.slice(0, alerts.length - prevCountRef.current)
+      setNewAlertIds((prev) => {
+        const next = new Set(prev)
+        newOnes.forEach((a) => next.add(a.id))
+        return next
+      })
+      // 3 秒後移除 NEW 標記
+      setTimeout(() => {
+        setNewAlertIds((prev) => {
+          const next = new Set(prev)
+          newOnes.forEach((a) => next.delete(a.id))
+          return next
+        })
+      }, 3000)
+    }
+    prevCountRef.current = alerts.length
+  }, [alerts.length])
 
   if (loading) {
     return (
