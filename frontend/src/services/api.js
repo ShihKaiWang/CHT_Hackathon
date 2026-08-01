@@ -122,3 +122,9 @@ export function connectWebSocket(onMessage) {
   ws.onmessage = (event) => onMessage(JSON.parse(event.data))
   return ws
 }
+
+// 智慧應用 AI Agent 統一呼叫
+export async function callSmartApp(action, params = {}) {
+  const res = await api.post('/dashboard/smart-app', { action, params })
+  return res.data
+}

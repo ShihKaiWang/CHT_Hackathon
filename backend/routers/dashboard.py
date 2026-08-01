@@ -133,6 +133,84 @@ def get_ete_calculation():
     return result
 
 
+@router.post("/smart-app")
+def smart_app_agent(request_body: dict):
+    """POST /api/dashboard/smart-app — 智慧應用 AI Agent 統一入口"""
+    import os
+    action = request_body.get("action", "")
+    params = request_body.get("params", {})
+
+    use_bedrock = os.getenv("USE_BEDROCK", "false").lower() == "true"
+    if not use_bedrock:
+        return {"reply": "", "error": "USE_BEDROCK is not enabled"}
+
+    from services.agent_loop import run_agent
+
+    prompts = {
+        "maas_plan": (
+            f"使用者需要出行規劃：\n"
+            f"- 起點：{params.get('from', '未指定')}\n"
+            f"- 終點：{params.get('to', '未指定')}\n\n"
+            f"請：1) 查詢即時路況（飽和度）2) 查詢是否有事件影響 3) 根據結果產出多模式出行建議\n"
+            f"回傳 JSON 格式：{{\"routes\": [{{\"type\": \"捷運/公車/YouBike/步行\", \"description\": \"路線描述\", "
+            f"\"steps\": [\"步驟1\", \"步驟2\"], \"time_min\": 數字, \"cost\": \"費用\", \"avoid_reason\": \"避開原因\"}}], "
+            f"\"warning\": \"路況警告（如有）\"}}"
+        ),
+        "dispatch_plan": (
+            f"目前需要進行共享運具調度分析：\n"
+            f"請：1) 查詢目前路況 2) 查詢即時事件 3) 判斷哪些區域需要增加運具\n"
+            f"回傳 JSON 格式：{{\"dispatch_actions\": [{{\"station\": \"站名\", \"action\": \"增派/撤離\", "
+            f"\"quantity\": 數字, \"reason\": \"原因\", \"priority\": \"high/medium/low\"}}], "
+            f"\"summary\": \"調度摘要\"}}"
+        ),
+        "event_impact": (
+            f"分析大型活動對路網的影響：\n"
+            f"- 活動：{params.get('event_name', '演唱會')}\n"
+            f"- 場館：{params.get('venue', '台北大巨蛋')}\n"
+            f"- 人數：{params.get('capacity', 50000)}\n\n"
+            f"請：1) 查詢場館周邊路段飽和度 2) 查詢基地台人流 3) 預估散場衝擊\n"
+            f"回傳 JSON 格式：{{\"impact_analysis\": {{\"peak_flow\": 數字, \"duration_min\": 數字, "
+            f"\"affected_roads\": [\"路段\"], \"recommendations\": [\"建議\"]}}, "
+            f"\"pre_event_actions\": [\"散場前行動\"], \"sop_triggered\": [\"第X條\"]}}"
+        ),
+        "weather_impact": (
+            f"分析天氣對路網的影響：\n"
+            f"- 天氣狀況：{params.get('condition', '降雨')}\n"
+            f"- 降雨機率：{params.get('rain_prob', 75)}%\n\n"
+            f"請：1) 查詢目前路段飽和度 2) 預估天氣影響後的容量變化\n"
+            f"回傳 JSON 格式：{{\"capacity_reduction\": \"百分比\", \"at_risk_roads\": [{{\"name\": \"路名\", "
+            f"\"current_sat\": 0.8, \"predicted_sat\": 0.92}}], \"recommendations\": [\"建議\"], "
+            f"\"alert_level\": \"high/medium/low\"}}"
+        ),
+        "analyze_report": (
+            f"民眾回報了一則路況：\n"
+            f"- 類型：{params.get('type', '塞車')}\n"
+            f"- 位置：{params.get('location', '未指定')}\n"
+            f"- 描述：{params.get('description', '')}\n\n"
+            f"請：1) 查詢該位置附近路段飽和度 2) 判斷是否需要啟動應變 3) 產出建議\n"
+            f"回傳 JSON 格式：{{\"verified\": true, \"severity\": \"high/medium/low\", "
+            f"\"related_road\": \"路段名\", \"current_saturation\": 0.8, "
+            f"\"recommendation\": \"建議行動\", \"sop_applicable\": \"第X條或無\"}}"
+        ),
+    }
+
+    prompt = prompts.get(action, f"處理智慧應用請求：{action}，參數：{json.dumps(params, ensure_ascii=False)}")
+
+    context = "回傳必須是純 JSON，不要加 markdown 標記或多餘文字。所有數值必須用工具查詢真實資料。"
+    result = run_agent(prompt, context=context)
+
+    # 解析結構化回覆
+    from services.agent_loop import _parse_structured_response
+    structured = _parse_structured_response(result.get("reply", ""))
+
+    return {
+        "structured": structured,
+        "raw_reply": result.get("reply", ""),
+        "tool_calls": result.get("tool_calls", []),
+        "iterations": result.get("iterations", 0),
+    }
+
+
 @router.get("/agent-patrol")
 def run_agent_patrol():
     """GET /api/dashboard/agent-patrol — AI Agent 執行一輪巡邏"""
