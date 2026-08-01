@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { MapContainer, TileLayer, Polyline, Circle, Marker, Popup, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
@@ -115,6 +115,30 @@ function PulseMarker({ position, color, size = 200 }) {
   return null
 }
 
+// 事件觸發時自動飛到事件地點
+function FlyToEvent({ eventStarted }) {
+  const map = useMap()
+  const hasFlewRef = useRef(false)
+
+  useEffect(() => {
+    if (eventStarted && !hasFlewRef.current) {
+      hasFlewRef.current = true
+      // 先 zoom out 一點讓使用者看到全局，再飛入事件點
+      setTimeout(() => {
+        map.flyTo(INCIDENT_LOCATION.pos, 16, {
+          duration: 2,
+          easeLinearity: 0.25,
+        })
+      }, 500)
+    }
+    if (!eventStarted) {
+      hasFlewRef.current = false
+    }
+  }, [eventStarted, map])
+
+  return null
+}
+
 function TrafficMap() {
   const { currentTime } = useSimClock()
   const eventStarted = currentTime >= '22:10'
@@ -150,6 +174,9 @@ function TrafficMap() {
             url="https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png"
             opacity={0.8}
           />
+
+          {/* 事件觸發時自動飛到事件地點 */}
+          <FlyToEvent eventStarted={eventStarted} />
 
           {/* 封閉路段（紅色粗虛線） */}
           {eventStarted && (
