@@ -13,19 +13,26 @@ const LANG_LABELS = {
   ko: { name: '한국어', flag: '🇰🇷' },
 }
 
-function MultiLangReport() {
+function MultiLangReport({ incidentResult }) {
   const [report, setReport] = useState(null)
   const [selectedLang, setSelectedLang] = useState('zh')
   const [loading, setLoading] = useState(true)
   const [dispatchedChannels, setDispatchedChannels] = useState([])
   const { currentTime } = useSimClock()
 
-  // 通報只有事件發生後（22:10+）才顯示
-  const eventTriggered = currentTime >= '22:10'
+  // 通報觸發條件：SimClock >= 22:10 或 已有事件注入結果
+  const eventTriggered = currentTime >= '22:10' || !!incidentResult
 
   useEffect(() => {
     loadReport()
   }, [])
+
+  // 事件注入後重新載入通報（取得 LLM 生成的最新多語文字）
+  useEffect(() => {
+    if (incidentResult) {
+      loadReport()
+    }
+  }, [incidentResult])
 
   async function loadReport() {
     try {

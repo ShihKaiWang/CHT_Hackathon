@@ -411,7 +411,7 @@ function App() {
         {/* ===== 3. 通報發佈 ===== */}
         {activeTab === 'notify' && (
           <div className="space-y-6">
-            <MultiLangReport />
+            <MultiLangReport incidentResult={incidentResult} />
             {/* 事件產出的民眾通報（從事件應變帶過來） */}
             {incidentResult && incidentResult.llm_guidance && (
               <div className="card-glass rounded-lg p-6">
