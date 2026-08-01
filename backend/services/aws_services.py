@@ -137,7 +137,37 @@ def notify_incident(event_name: str, severity: str, location: str) -> bool:
         f"系統已自動啟動應變流程，請登入 Dashboard 查看。\n"
         f"https://d29bomxt4wi5pg.cloudfront.net\n"
     )
-    return send_alert_notification(subject, message)
+    # 同時發送 SNS (Email + SMS) 和 LINE Notify
+    sns_ok = send_alert_notification(subject, message)
+    line_ok = send_line_notify(f"\n⚠️ [{severity}] {event_name}\n📍 {location}\n⏰ {datetime.now().strftime('%H:%M:%S')}\n🔗 https://d29bomxt4wi5pg.cloudfront.net")
+    return sns_ok or line_ok
+
+
+# ============ LINE Notify ============
+
+LINE_NOTIFY_TOKEN = os.getenv("LINE_NOTIFY_TOKEN", "")
+
+
+def send_line_notify(message: str) -> bool:
+    """透過 LINE Notify 發送通知"""
+    if not LINE_NOTIFY_TOKEN:
+        print("[LINE] No token configured, skipping")
+        return False
+    try:
+        import urllib.request
+        import urllib.parse
+        data = urllib.parse.urlencode({"message": message}).encode()
+        req = urllib.request.Request(
+            "https://notify-api.line.me/api/notify",
+            data=data,
+            headers={"Authorization": f"Bearer {LINE_NOTIFY_TOKEN}"},
+        )
+        urllib.request.urlopen(req, timeout=10)
+        print(f"[LINE] Notify sent")
+        return True
+    except Exception as e:
+        print(f"[LINE Error] {e}")
+        return False
 
 
 # ============ SSM Parameter Store ============

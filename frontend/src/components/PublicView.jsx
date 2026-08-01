@@ -82,6 +82,19 @@ function PublicView({ incidentResult }) {
   const s = incidentResult?.agent_structured || {}
   const hasIncident = !!incidentResult
 
+  // Web Push 瀏覽器通知 — 事件發生時推送
+  useEffect(() => {
+    if (hasIncident && 'Notification' in window) {
+      if (Notification.permission === 'granted') {
+        const title = s.situation?.event_type || incidentResult?.event || '交通事件通報'
+        const body = s.guidance_text || `${s.situation?.location || ''}附近有交通事件，請注意替代路線。`
+        new Notification(`⚠️ ${title}`, { body, icon: '🚨' })
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission()
+      }
+    }
+  }, [hasIncident])
+
   // 動態事件列表（從 Agent 結果產生）
   const dynamicIncidents = hasIncident ? [{
     id: 1,
