@@ -302,7 +302,15 @@ function App() {
             <button onClick={() => setChatOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 rounded-lg text-xs text-blue-400 transition-all">
               💬 策略諮詢
             </button>
-            <button onClick={() => setFullscreen(!fullscreen)} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg text-xs text-slate-300 transition-all" title="ESC 退出">
+            <button onClick={() => {
+              if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen()
+                setFullscreen(true)
+              } else {
+                document.exitFullscreen()
+                setFullscreen(false)
+              }
+            }} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg text-xs text-slate-300 transition-all" title="ESC 退出">
               🖥️ 全屏
             </button>
             <button onClick={handleLogout} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 rounded-lg text-xs text-red-400 transition-all">
@@ -343,7 +351,7 @@ function App() {
           </nav>
           <div className="flex items-center gap-2">
             <button onClick={() => setChatOpen(true)} className="px-2 py-1 text-xs text-blue-400 bg-blue-600/20 rounded">💬</button>
-            <button onClick={() => setFullscreen(false)} className="px-3 py-1.5 text-xs text-white bg-red-600 hover:bg-red-700 rounded-lg font-medium">✕ 退出全屏</button>
+            <button onClick={() => { document.exitFullscreen(); setFullscreen(false) }} className="px-3 py-1.5 text-xs text-white bg-red-600 hover:bg-red-700 rounded-lg font-medium">✕ 退出全屏</button>
           </div>
         </div>
       )}
