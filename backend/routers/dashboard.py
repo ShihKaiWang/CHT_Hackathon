@@ -80,6 +80,59 @@ async def websocket_endpoint(websocket: WebSocket):
         ws_limiter.disconnect(ip)
 
 
+@router.get("/ete")
+def get_ete_calculation():
+    """GET /api/dashboard/ete — 即時 ETE 計算（程式運算 + LLM 解釋）"""
+    from services.sop_engine import calculate_ete, classify_event
+    from services.data_loader import data_store
+
+    # 取最嚴重的事件
+    incidents = data_store.incidents
+    severity = "Critical"
+    affected_segment = ""
+    incident_desc = "路面塌陷"
+    for inc in incidents:
+        if inc.get("severity") in ["Critical", "High"]:
+            severity = inc["severity"]
+            affected_segment = inc.get("affected_segment", "")
+            incident_desc = inc.get("description", "交通事故")[:50]
+            break
+
+    # 程式計算 ETE
+    ete = calculate_ete(severity, [affected_segment] if affected_segment else [])
+
+    # 取排除路線（飽和度 >= 0.85 的路段）
+    traffic = data_store.get_traffic_timeseries()
+    saturation = traffic.get("saturation", [])
+    excluded = [s for s in saturation if s["saturation"] >= 0.85]
+    selected = [s for s in saturation if s["saturation"] < 0.85 and s["saturation"] >= 0.5][:3]
+
+    # 分級
+    level = classify_event(ete["avg_saturation"])
+
+    result = {
+        "ete": ete,
+        "level": level,
+        "severity": severity,
+        "incident_desc": incident_desc,
+        "excluded_roads": excluded,
+        "selected_roads": selected,
+    }
+
+    # LLM 解釋（如果啟用）
+    try:
+        from services.llm_service import explain_ete
+        explanation = explain_ete(
+            ete["ete_minutes"], severity, ete["avg_saturation"], incident_desc
+        )
+        if explanation:
+            result["llm_explanation"] = explanation
+    except Exception:
+        pass
+
+    return result
+
+
 @router.get("/agent-patrol")
 def run_agent_patrol():
     """GET /api/dashboard/agent-patrol — AI Agent 執行一輪巡邏"""
