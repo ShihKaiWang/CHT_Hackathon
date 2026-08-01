@@ -192,6 +192,25 @@ def smart_app_agent(request_body: dict):
             f"\"related_road\": \"路段名\", \"current_saturation\": 0.8, "
             f"\"recommendation\": \"建議行動\", \"sop_applicable\": \"第X條或無\"}}"
         ),
+        "risk_prediction": (
+            f"請進行全面風險預判分析：\n"
+            f"目前天氣：{params.get('weather', '未知')}\n"
+            f"降雨量：{params.get('rain_mm', 0)} mm/h\n"
+            f"風速：{params.get('wind_kmh', 0)} km/h\n"
+            f"能見度：{params.get('visibility_km', 10)} km\n\n"
+            f"請：1) 查詢所有路段飽和度 2) 查詢即時事件 3) 結合天氣資訊，預判以下風險：\n"
+            f"- 塞車風險（飽和度趨勢）\n"
+            f"- 車禍風險（高飽和度+低能見度路段）\n"
+            f"- 積水風險（降雨量+地勢低窪路段）\n"
+            f"- 行道樹倒塌風險（強風路段）\n"
+            f"- 地下道積水風險（降雨量+地下道位置）\n\n"
+            f"回傳 JSON 格式：{{\"risks\": [{{\"type\": \"congestion/accident/flood/fallen_tree/underpass_flood\", "
+            f"\"road\": \"路段名\", \"level\": \"high/medium/low\", \"probability\": 85, "
+            f"\"reason\": \"判斷依據\", \"sop_clause\": \"第X條\", "
+            f"\"lat\": 25.04, \"lng\": 121.55, "
+            f"\"improvement\": \"改善建議\"}}], "
+            f"\"summary\": \"整體風險摘要\", \"total_high_risk\": 0}}"
+        ),
     }
 
     prompt = prompts.get(action, f"處理智慧應用請求：{action}，參數：{json.dumps(params, ensure_ascii=False)}")

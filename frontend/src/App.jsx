@@ -17,6 +17,7 @@ import MaaSPlanner from './components/MaaSPlanner'
 import SharedMobility from './components/SharedMobility'
 import ProactiveAlert from './components/ProactiveAlert'
 import PublicReport from './components/PublicReport'
+import RiskPredictionMap from './components/RiskPredictionMap'
 import CitizenSMS from './components/CitizenSMS'
 import SecurityModule from './components/SecurityModule'
 import HumanOverride from './components/HumanOverride'
@@ -39,6 +40,7 @@ const EXTEND_SUBTABS = [
   { id: 'shared', label: '🚲 運具調度' },
   { id: 'simulator', label: '🏟️ 活動模擬' },
   { id: 'weather', label: '🌧️ 天氣連動' },
+  { id: 'riskmap', label: '🔮 風險預判' },
   { id: 'crowdreport', label: '📢 公眾回報' },
 ]
 
@@ -442,6 +444,7 @@ function App() {
             {extendSub === 'shared' && <SharedMobility />}
             {extendSub === 'simulator' && <EventSimulator />}
             {extendSub === 'weather' && <WeatherModule weatherEnabled={weatherEnabled} setWeatherEnabled={setWeatherEnabled} />}
+            {extendSub === 'riskmap' && <RiskPredictionMap />}
             {extendSub === 'crowdreport' && <PublicReport />}
           </div>
         )}
