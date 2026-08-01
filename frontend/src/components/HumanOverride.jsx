@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSimClock } from '../hooks/useSimClock.jsx'
 
 // AI 產出的決策（事件 22:10 發生後由 AI 產出）
@@ -67,13 +67,24 @@ const CATEGORY_ICONS = {
   '跨系統聯動': '🔗',
 }
 
+// 用模組層級變數持久化決策狀態（避免 tab 切換時重置）
+let persistedDecisions = null
+
 function HumanOverride() {
-  const [decisions, setDecisions] = useState(AI_DECISIONS)
+  const [decisions, setDecisions] = useState(() => {
+    if (persistedDecisions) return persistedDecisions
+    return AI_DECISIONS
+  })
   const [overrideModal, setOverrideModal] = useState(null)
   const [overrideReason, setOverrideReason] = useState('')
   const [overrideAction, setOverrideAction] = useState('')
   const [mode, setMode] = useState('review')
   const { currentTime } = useSimClock()
+
+  // 同步到模組層級快取
+  useEffect(() => {
+    persistedDecisions = decisions
+  }, [decisions])
 
   // 依模擬時鐘過濾：只顯示 time <= currentTime 的決策
   const visibleDecisions = decisions.filter((d) => d.time <= currentTime)
