@@ -17,16 +17,7 @@ const PERMISSION_LABELS = {
   route: '路線規劃',
 }
 
-const INITIAL_LOGS = [
-  { id: 1, time: '14:32:05', user: '王指揮官', role: 'commander', action: '注入事件', detail: 'EVT-001 路面塌陷', status: 'success' },
-  { id: 2, time: '14:32:08', user: '系統', role: 'system', action: 'SOP 匹配', detail: '觸發第 2 條主疏散規則', status: 'success' },
-  { id: 3, time: '14:32:15', user: '系統', role: 'system', action: 'AI 路網計算', detail: '產出 2 條替代路線', status: 'success' },
-  { id: 4, time: '14:33:01', user: '王指揮官', role: 'commander', action: '發送 CBS 通報', detail: '4 語版本推播至 BL17 基地台', status: 'success' },
-  { id: 5, time: '14:33:02', user: '王指揮官', role: 'commander', action: '發送 SMS', detail: '發送至 3,100 用戶', status: 'success' },
-  { id: 6, time: '14:35:20', user: '未授權用戶', role: 'public', action: '嘗試發送通報', detail: 'CBS 推播', status: 'denied' },
-  { id: 7, time: '14:36:10', user: '匿名市民', role: 'public', action: '提交回報', detail: '忠孝東路/光復路口塞車', status: 'success' },
-  { id: 8, time: '14:36:15', user: '系統', role: 'system', action: '交叉驗證', detail: '民眾回報與感測器數據吻合', status: 'success' },
-]
+const INITIAL_LOGS = []
 
 function SecurityModule() {
   const [auditLogs, setAuditLogs] = useState(INITIAL_LOGS)
