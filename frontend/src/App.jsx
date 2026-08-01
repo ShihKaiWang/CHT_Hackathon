@@ -49,14 +49,18 @@ const SYSTEM_SUBTABS = [
 ]
 
 function App() {
+  // URL 參數自動分流：?mode=public 直接進民眾模式
+  const urlParams = new URLSearchParams(window.location.search)
+  const autoPublic = urlParams.get('mode') === 'public'
+
   const [activeTab, setActiveTab] = useState('overview')
   const [extendSub, setExtendSub] = useState('maas')
   const [systemSub, setSystemSub] = useState('security')
   const [fullscreen, setFullscreen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
-  const [publicMode, setPublicMode] = useState(false)
-  const [loggedIn, setLoggedIn] = useState(false)
-  const [userRole, setUserRole] = useState('')
+  const [publicMode, setPublicMode] = useState(autoPublic)
+  const [loggedIn, setLoggedIn] = useState(autoPublic)
+  const [userRole, setUserRole] = useState(autoPublic ? 'public' : '')
   const [loginPassword, setLoginPassword] = useState('')
   const [loginError, setLoginError] = useState('')
   const [weatherEnabled, setWeatherEnabled] = useState(false)
