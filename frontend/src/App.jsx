@@ -242,12 +242,15 @@ function App() {
       {loggedIn && publicMode && (
         <div className="min-h-screen bg-slate-900 p-4">
           <div className="max-w-lg mx-auto mb-4 flex items-center justify-between">
-            <button
-              onClick={() => setPublicMode(false)}
-              className="text-xs text-slate-400 hover:text-white bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              {userRole !== 'public' ? '← 返回指揮官模式' : ''}
-            </button>
+            {/* 指揮官預覽民眾視角時才顯示返回按鈕 */}
+            {userRole !== 'public' ? (
+              <button
+                onClick={() => setPublicMode(false)}
+                className="text-xs text-slate-400 hover:text-white bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                ← 返回指揮官模式
+              </button>
+            ) : <div />}
             <button
               onClick={handleLogout}
               className="text-xs text-slate-400 hover:text-white bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg transition-colors"
