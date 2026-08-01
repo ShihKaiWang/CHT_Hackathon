@@ -103,13 +103,12 @@ def _local_rule_answer(message: str) -> str:
 
 
 def _bedrock_rag_answer(message: str) -> str:
-    """使用 Bedrock Claude 直接回答（SOP 作為 context）"""
+    """使用 AI Agent（Tool Use）自主決策回答"""
     try:
-        from services.llm_service import chat_with_sop
-        result = chat_with_sop(message)
+        from services.agent_loop import agent_chat
+        result = agent_chat(message)
         if result:
             return result
-        # LLM 回傳空值時 fallback
         return _local_rule_answer(message)
     except Exception as e:
         return _local_rule_answer(message)

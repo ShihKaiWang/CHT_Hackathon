@@ -119,11 +119,12 @@ def process_incident(event_type: str, location: str, description: str = "") -> d
 
     # LLM 生成導引文字（USE_BEDROCK=true 時啟用）
     try:
-        from services.llm_service import generate_routing_guidance
-        inc_info = {"description": description or _event_type_label(event_type), "location": road_name, "severity": severity}
-        guidance = generate_routing_guidance(inc_info, alternatives, ete.get("ete_minutes", 30))
-        if guidance:
-            result["llm_guidance"] = guidance
+        from services.agent_loop import agent_process_incident
+        agent_result = agent_process_incident(event_type, road_name, description)
+        if agent_result.get("reply"):
+            result["llm_guidance"] = agent_result["reply"]
+            result["agent_tool_calls"] = agent_result.get("tool_calls", [])
+            result["agent_iterations"] = agent_result.get("iterations", 0)
     except Exception:
         pass
 

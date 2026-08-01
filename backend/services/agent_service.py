@@ -159,15 +159,16 @@ def run_patrol() -> dict:
         }
     }
 
-    # LLM 生成分析摘要（USE_BEDROCK=true 時啟用）
-    if anomalies:
-        try:
-            from services.llm_service import generate_anomaly_summary
-            summary_text = generate_anomaly_summary(anomalies)
-            if summary_text:
-                result["llm_summary"] = summary_text
-                thoughts.append({"time": now, "type": "action", "msg": f"📝 AI 分析摘要：{summary_text[:80]}..."})
-        except Exception:
-            pass
+    # LLM 生成分析摘要（USE_BEDROCK=true 時啟用 Agent 自主巡邏）
+    try:
+        from services.agent_loop import agent_patrol as agent_patrol_loop
+        agent_result = agent_patrol_loop()
+        if agent_result.get("reply"):
+            result["llm_summary"] = agent_result["reply"]
+            result["agent_tool_calls"] = agent_result.get("tool_calls", [])
+            result["agent_iterations"] = agent_result.get("iterations", 0)
+            thoughts.append({"time": now, "type": "action", "msg": f"📝 Agent 自主分析完成（{agent_result.get('iterations', 0)} 輪推理，{len(agent_result.get('tool_calls', []))} 次工具呼叫）"})
+    except Exception:
+        pass
 
     return result
