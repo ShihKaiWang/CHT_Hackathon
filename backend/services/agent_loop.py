@@ -198,8 +198,122 @@ def agent_chat(message: str) -> str:
     return result.get("reply", "")
 
 def agent_process_incident(event_type: str, location: str, description: str) -> dict:
-    prompt = f"突發事件：類型={event_type}，位置={location}，描述={description}\n請：1)查飽和度 2)判級別 3)查替代路線 4)算ETE 5)檢查漫遊率 6)產出應變建議"
-    return run_agent(prompt)
+    """事件處理 — Agent 自主規劃，回傳結構化 JSON"""
+
+    STRUCTURED_PROMPT = """你必須根據工具查詢結果，回傳嚴格的 JSON 格式（不要 markdown，不要多餘文字）。
+JSON 結構如下：
+{
+  "situation": {
+    "event_type": "事件類型",
+    "location": "事件位置",
+    "description": "事件描述",
+    "affected_scope": "影響範圍"
+  },
+  "classification": {
+    "level": "A 或 B 或 正常",
+    "saturation": 0.95,
+    "basis": "判定依據說明"
+  },
+  "alternatives": [
+    {"name": "路線名", "saturation": 0.5, "capacity": 1500, "status": "available", "recommendation": "推薦原因"}
+  ],
+  "ete": {
+    "minutes": 60,
+    "formula": "公式字串",
+    "explanation": "白話文解釋"
+  },
+  "multilang": {
+    "triggered": true,
+    "roaming_rate": 0.45,
+    "station": "站名",
+    "zh": "中文通報",
+    "en": "English alert",
+    "ja": "日本語通報",
+    "ko": "한국어 통보"
+  },
+  "sop_actions": [
+    {"priority": "P0", "action": "行動內容", "unit": "執行單位", "sop_clause": "第X條"}
+  ],
+  "guidance_text": "面向民眾的導引文字（100字內）"
+}
+
+重要規則：
+1. 回傳必須是純 JSON，不要加 ```json 標記
+2. 所有數值必須用工具查詢，不可編造
+3. 替代路線必須排除飽和度 >= 0.85 的路段
+4. 必須引用 SOP 條款"""
+
+    prompt = (
+        f"突發事件需要處理：\n"
+        f"- 類型：{event_type}\n"
+        f"- 位置：{location}\n"
+        f"- 描述：{description}\n\n"
+        f"請依序呼叫工具查詢後，以嚴格 JSON 格式回傳結果。"
+    )
+
+    result = run_agent(prompt, context=STRUCTURED_PROMPT)
+    reply = result.get("reply", "")
+
+    # 多重 JSON 解析策略
+    structured = _parse_structured_response(reply)
+
+    return {
+        "structured": structured,
+        "raw_reply": reply,
+        "tool_calls": result.get("tool_calls", []),
+        "iterations": result.get("iterations", 0),
+    }
+
+
+def _parse_structured_response(text: str) -> dict:
+    """多重策略解析 LLM 的 JSON 回傳"""
+    import re
+
+    # 策略 1：直接解析（如果 LLM 乖乖回傳純 JSON）
+    try:
+        return json.loads(text.strip())
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # 策略 2：提取 {...} 區塊
+    try:
+        # 找最外層的 { }
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        if start >= 0 and end > start:
+            candidate = text[start:end]
+            return json.loads(candidate)
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # 策略 3：提取 ```json ... ``` 區塊
+    try:
+        match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL)
+        if match:
+            return json.loads(match.group(1))
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # 策略 4：逐行移除非 JSON 內容後解析
+    try:
+        lines = text.split("\n")
+        json_lines = []
+        in_json = False
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("{"):
+                in_json = True
+            if in_json:
+                json_lines.append(line)
+            if stripped.endswith("}") and in_json:
+                break
+        if json_lines:
+            return json.loads("\n".join(json_lines))
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # 全部失敗 → 回傳空結構，前端用 raw_reply fallback
+    return {}
 
 def agent_patrol() -> dict:
     prompt = "執行自主巡邏：1)查所有路段飽和度 2)判定異常級別 3)查漫遊率 4)查即時事件 5)產出摘要和預警"

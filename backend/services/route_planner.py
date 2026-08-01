@@ -117,14 +117,16 @@ def process_incident(event_type: str, location: str, description: str = "") -> d
         "mrt_status": mrt,
     }
 
-    # LLM 生成導引文字（USE_BEDROCK=true 時啟用）
+    # AI Agent 結構化分析（USE_BEDROCK=true 時啟用）
     try:
         from services.agent_loop import agent_process_incident
         agent_result = agent_process_incident(event_type, road_name, description)
-        if agent_result.get("reply"):
-            result["llm_guidance"] = agent_result["reply"]
-            result["agent_tool_calls"] = agent_result.get("tool_calls", [])
-            result["agent_iterations"] = agent_result.get("iterations", 0)
+        if agent_result.get("structured"):
+            result["agent_structured"] = agent_result["structured"]
+        if agent_result.get("raw_reply"):
+            result["llm_guidance"] = agent_result.get("structured", {}).get("guidance_text", agent_result["raw_reply"][:500])
+        result["agent_tool_calls"] = agent_result.get("tool_calls", [])
+        result["agent_iterations"] = agent_result.get("iterations", 0)
     except Exception:
         pass
 

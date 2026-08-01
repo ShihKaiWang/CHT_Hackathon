@@ -314,68 +314,127 @@ function IncidentPanel({ incidentResult, setIncidentResult }) {
         )}
         {result && (
           <div className="space-y-4">
+            {/* 情況分析 */}
             <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
-              <p className="text-sm font-medium text-red-400">事件：{result.event}</p>
-              <p className="text-xs text-slate-400 mt-1">
-                影響路段：{result.affected_roads.join('、')}
-              </p>
-              {sopMatch && (
-                <p className="text-xs text-amber-400 mt-1">
-                  觸發 SOP {sopMatch.clause}（{sopMatch.label}）
-                </p>
+              <h3 className="text-sm font-medium text-red-400 mb-2">📊 情況分析</h3>
+              {result.agent_structured?.situation ? (
+                <div className="text-xs text-slate-300 space-y-1">
+                  <p>事件類型：<span className="text-white">{result.agent_structured.situation.event_type}</span></p>
+                  <p>事件位置：<span className="text-white">{result.agent_structured.situation.location}</span></p>
+                  <p>事件描述：<span className="text-white">{result.agent_structured.situation.description}</span></p>
+                  <p>影響範圍：<span className="text-red-300">{result.agent_structured.situation.affected_scope}</span></p>
+                </div>
+              ) : (
+                <p className="text-sm text-white">{result.event}</p>
               )}
             </div>
 
-            <div>
-              <h3 className="text-sm font-medium text-slate-300 mb-2">🛤️ 替代路線</h3>
-              {result.alternative_routes.map((route, i) => (
-                <div key={i} className="bg-slate-700 rounded-lg p-3 mb-2">
-                  <p className="text-sm text-white">{route.path}</p>
-                  <div className="flex gap-3 mt-1 text-xs text-slate-400">
-                    <span>⏱️ ETE: {route.ete}</span>
-                    <span>🚗 壅塞度: {route.congestion}</span>
+            {/* 級別判定 */}
+            <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
+              <h3 className="text-sm font-medium text-purple-400 mb-2">🚦 級別判定</h3>
+              {result.agent_structured?.classification ? (
+                <div className="text-xs text-slate-300 space-y-1">
+                  <p>判定結果：<span className="text-red-400 font-bold text-base">{result.agent_structured.classification.level} 級</span></p>
+                  <p>飽和度：<span className="text-white">{(result.agent_structured.classification.saturation * 100).toFixed(0)}%</span></p>
+                  <p>依據：<span className="text-slate-200">{result.agent_structured.classification.basis}</span></p>
+                </div>
+              ) : (
+                <p className="text-xs text-white">{result.level} 級（{result.severity}）</p>
+              )}
+            </div>
+
+            {/* 替代路線 */}
+            <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
+              <h3 className="text-sm font-medium text-green-400 mb-2">🛤️ 替代路線</h3>
+              {result.agent_structured?.alternatives?.length > 0 ? (
+                <div className="space-y-2">
+                  {result.agent_structured.alternatives.map((alt, i) => (
+                    <div key={i} className="flex items-center justify-between bg-slate-800 rounded p-2">
+                      <div>
+                        <span className="text-sm text-white font-medium">{alt.name}</span>
+                        <span className="text-xs text-slate-400 ml-2">{alt.recommendation}</span>
+                      </div>
+                      <div className="text-xs text-green-400">
+                        飽和度 {(alt.saturation * 100).toFixed(0)}% | {alt.capacity} vph
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                result.alternative_routes?.map((route, i) => (
+                  <div key={i} className="bg-slate-700 rounded-lg p-2 mb-1 text-sm text-white">
+                    {route.path} — ETE {route.ete}
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
 
-            <div>
-              <h3 className="text-sm font-medium text-slate-300 mb-2">🚦 號誌調整</h3>
-              {result.signal_adjustments.map((adj, i) => (
-                <div key={i} className="text-sm text-slate-300 mb-1">
-                  <span className="text-slate-400">{adj.intersection}：</span>
-                  {adj.action}
+            {/* ETE */}
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+              <h3 className="text-sm font-medium text-amber-400 mb-2">⏱️ ETE 預估</h3>
+              {result.agent_structured?.ete ? (
+                <div className="text-xs text-slate-300 space-y-1">
+                  <p className="text-xl font-bold text-amber-400 font-mono">{result.agent_structured.ete.minutes} 分鐘</p>
+                  <p className="font-mono text-slate-400">{result.agent_structured.ete.formula}</p>
+                  <p className="text-slate-200 mt-1">{result.agent_structured.ete.explanation}</p>
                 </div>
-              ))}
+              ) : (
+                <p className="text-xl font-bold text-amber-400">{result.ete?.ete_minutes} 分鐘</p>
+              )}
             </div>
 
-            <div className="text-xs text-green-400 mt-3 p-2 bg-green-500/10 border border-green-500/20 rounded-lg">
-              ✅ 處理完成（耗時 {countdown} 秒 {countdown <= 60 ? '— 目標達成！' : ''}）
-            </div>
-
-            {/* AI Agent 導引文字 */}
-            {result.llm_guidance && (
-              <div className="mt-3 p-4 bg-cyan-500/5 border border-cyan-500/20 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm">🤖</span>
-                  <span className="text-xs text-cyan-400 font-medium">AI Agent 導引建議（LLM 生成）</span>
-                  {result.agent_iterations && (
-                    <span className="text-xs text-slate-500">
-                      {result.agent_iterations} 輪推理
-                    </span>
-                  )}
+            {/* 多語通報 */}
+            {result.agent_structured?.multilang?.triggered && (
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                <h3 className="text-sm font-medium text-blue-400 mb-2">🌐 多語通報（LLM 生成）</h3>
+                <p className="text-xs text-slate-400 mb-2">漫遊率 {(result.agent_structured.multilang.roaming_rate * 100).toFixed(0)}% — 站點：{result.agent_structured.multilang.station}</p>
+                <div className="space-y-1.5">
+                  {['zh', 'en', 'ja', 'ko'].map((lang) => (
+                    result.agent_structured.multilang[lang] && (
+                      <div key={lang} className="bg-slate-800 rounded p-2 text-xs">
+                        <span className="text-blue-300 font-medium mr-2">{lang.toUpperCase()}</span>
+                        <span className="text-slate-300">{result.agent_structured.multilang[lang]}</span>
+                      </div>
+                    )
+                  ))}
                 </div>
-                <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{result.llm_guidance}</p>
+              </div>
+            )}
+
+            {/* SOP 行動方案 */}
+            {result.agent_structured?.sop_actions?.length > 0 && (
+              <div className="bg-slate-700/50 border border-slate-600 rounded-lg p-3">
+                <h3 className="text-sm font-medium text-white mb-2">📋 SOP 行動方案</h3>
+                <div className="space-y-1.5">
+                  {result.agent_structured.sop_actions.map((action, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs">
+                      <span className={`px-1.5 py-0.5 rounded font-bold ${action.priority === 'P0' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                        {action.priority}
+                      </span>
+                      <span className="text-white flex-1">{action.action}</span>
+                      <span className="text-slate-500">{action.unit}</span>
+                      <span className="text-cyan-400">{action.sop_clause}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 民眾導引 */}
+            {(result.agent_structured?.guidance_text || result.llm_guidance) && (
+              <div className="bg-cyan-500/5 border border-cyan-500/20 rounded-lg p-3">
+                <h3 className="text-sm font-medium text-cyan-400 mb-1">🤖 民眾導引文字（AI Agent 生成）</h3>
+                <p className="text-sm text-slate-300">{result.agent_structured?.guidance_text || result.llm_guidance}</p>
               </div>
             )}
 
             {/* Agent 推理過程 */}
             {result.agent_tool_calls && result.agent_tool_calls.length > 0 && (
-              <div className="mt-2 p-3 bg-slate-900 border border-slate-700 rounded-lg">
+              <div className="bg-slate-900 border border-slate-700 rounded-lg p-3">
                 <p className="text-xs text-cyan-400 font-medium mb-2">
-                  🔗 Agent 推理過程（{result.agent_tool_calls.length} 次工具呼叫）
+                  🔗 Agent 推理（{result.agent_iterations} 輪，{result.agent_tool_calls.length} 次工具呼叫）
                 </p>
-                <div className="space-y-1">
+                <div className="space-y-1 max-h-32 overflow-y-auto">
                   {result.agent_tool_calls.map((tc, j) => (
                     <div key={j} className="text-xs text-slate-400 flex items-start gap-1">
                       <span className="text-green-400 flex-shrink-0">→</span>
@@ -385,6 +444,25 @@ function IncidentPanel({ incidentResult, setIncidentResult }) {
                 </div>
               </div>
             )}
+
+            {/* 完成狀態 + 匯出 */}
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-green-400 p-2 bg-green-500/10 border border-green-500/20 rounded-lg">
+                ✅ 處理完成（{countdown} 秒 {countdown <= 60 ? '— 目標達成！' : ''}）
+              </div>
+              <button
+                onClick={() => {
+                  const text = result.agent_structured
+                    ? JSON.stringify(result.agent_structured, null, 2)
+                    : result.llm_guidance || JSON.stringify(result, null, 2)
+                  navigator.clipboard.writeText(text)
+                  alert('報告已複製到剪貼簿！')
+                }}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg transition-colors"
+              >
+                📄 匯出報告
+              </button>
+            </div>
           </div>
         )}
       </div>
