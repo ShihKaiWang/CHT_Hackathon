@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MapContainer, TileLayer, Polyline, Circle, Marker, Popup, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { useSimClock } from '../hooks/useSimClock.jsx'
+import { fetchTrafficData } from '../services/api'
 
 // 修正 Leaflet 預設 marker icon 路徑問題
 delete L.Icon.Default.prototype._getIconUrl
@@ -91,6 +92,17 @@ const SIGNAL_ADJUSTMENTS = [
   { pos: [25.04440, 121.55110], label: '市民大道/光復路口：東西向+15%' },
 ]
 
+// 路段名稱 → 地圖座標對應（用於飽和度超標時高亮）
+const ROAD_COORDS = {
+  '忠孝東路四段': { coords: ZHONGXIAO_ROAD, center: [25.04095, 121.55110] },
+  '光復南路': { coords: GUANGFU_ROAD, center: [25.04095, 121.55110] },
+  '基隆路一段': { coords: [[25.04440, 121.55790], [25.04050, 121.55790], [25.03690, 121.55790]], center: [25.04050, 121.55790] },
+  '市民大道四段': { coords: CIVIC_BLVD, center: [25.04440, 121.55110] },
+  '仁愛路四段': { coords: RENAI_ROAD, center: [25.03730, 121.55110] },
+  '敦化南路一段': { coords: [[25.04480, 121.54900], [25.04120, 121.54900], [25.03750, 121.54900]], center: [25.04120, 121.54900] },
+  '大安路一段': { coords: DAAN_ROAD, center: [25.04120, 121.54570] },
+}
+
 // 動態 pulse 動畫元件
 function PulseMarker({ position, color, size = 200 }) {
   const map = useMap()
@@ -111,6 +123,27 @@ function PulseMarker({ position, color, size = 200 }) {
     const marker = L.marker(position, { icon: pulseIcon }).addTo(map)
     return () => map.removeLayer(marker)
   }, [map, position, color])
+
+  return null
+}
+
+// 飽和度超標時飛到該路段
+function FlyToSaturation({ criticalRoads, lastFlewRef }) {
+  const map = useMap()
+
+  useEffect(() => {
+    if (criticalRoads.length > 0) {
+      // 找第一個還沒飛過去的路段
+      const target = criticalRoads.find((r) => !lastFlewRef.current.has(r.name))
+      if (target && ROAD_COORDS[target.name]) {
+        lastFlewRef.current.add(target.name)
+        map.flyTo(ROAD_COORDS[target.name].center, 16, {
+          duration: 1.5,
+          easeLinearity: 0.3,
+        })
+      }
+    }
+  }, [criticalRoads, map])
 
   return null
 }
@@ -142,6 +175,20 @@ function FlyToEvent({ eventStarted }) {
 function TrafficMap() {
   const { currentTime } = useSimClock()
   const eventStarted = currentTime >= '22:10'
+  const [saturationData, setSaturationData] = useState([])
+  const lastFlewRef = useRef(new Set())
+
+  // 載入飽和度資料
+  useEffect(() => {
+    fetchTrafficData().then((data) => {
+      if (data?.saturation) setSaturationData(data.saturation)
+    }).catch(() => {})
+  }, [])
+
+  // 超標路段（飽和度 >= 0.85）
+  const criticalRoads = saturationData.filter(
+    (d) => d.saturation >= 0.85 && ROAD_COORDS[d.name]
+  )
 
   return (
     <div className="card-glass rounded-lg p-4">
@@ -172,6 +219,33 @@ function TrafficMap() {
 
           {/* 事件觸發時自動飛到事件地點 */}
           <FlyToEvent eventStarted={eventStarted} />
+
+          {/* 飽和度超標路段高亮 + 飛行 */}
+          <FlyToSaturation criticalRoads={criticalRoads} lastFlewRef={lastFlewRef} />
+          {criticalRoads.map((road) => (
+            ROAD_COORDS[road.name] && (
+              <Polyline
+                key={`sat-${road.id}`}
+                positions={ROAD_COORDS[road.name].coords}
+                pathOptions={{
+                  color: road.saturation >= 0.95 ? '#ef4444' : '#f59e0b',
+                  weight: 10,
+                  opacity: 0.7,
+                  dashArray: road.saturation >= 0.95 ? '' : '10, 6',
+                }}
+              >
+                <Popup>
+                  <div style={{ color: '#1e293b' }}>
+                    <strong>⚠️ {road.name}</strong>
+                    <br />飽和度：<span style={{ color: road.saturation >= 0.95 ? '#dc2626' : '#d97706' }}>
+                      {(road.saturation * 100).toFixed(0)}%
+                    </span>
+                    <br />狀態：{road.saturation >= 0.95 ? '🔴 A級癱瘓' : '🟡 B級壅擠'}
+                  </div>
+                </Popup>
+              </Polyline>
+            )
+          ))}
 
           {/* 封閉路段（紅色粗虛線） */}
           {eventStarted && (
