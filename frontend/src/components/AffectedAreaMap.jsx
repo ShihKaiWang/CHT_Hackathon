@@ -61,7 +61,7 @@ function AffectedAreaMap() {
       <p className="text-xs text-slate-400 mb-4">基地台覆蓋範圍與通知推播區域</p>
 
       {/* 模擬地圖區域 */}
-      <div className="relative w-full h-64 bg-slate-900 rounded-lg border border-slate-700 overflow-hidden mb-4">
+      <div className="relative w-full h-96 bg-slate-900 rounded-lg border border-slate-700 overflow-hidden mb-4">
         {/* 格線背景 */}
         <div className="absolute inset-0 opacity-10"
           style={{
@@ -73,21 +73,23 @@ function AffectedAreaMap() {
         {/* 路網示意線 */}
         <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
           {/* 忠孝東路（主要道路 - 封閉） */}
-          <line x1="20" y1="35" x2="90" y2="35" stroke="#ef4444" strokeWidth="0.8" strokeDasharray="2,1" />
-          <text x="25" y="33" fill="#ef4444" fontSize="2.5">忠孝東路 ✕ 封閉</text>
+          <line x1="15" y1="35" x2="92" y2="35" stroke="#ef4444" strokeWidth="1.2" strokeDasharray="3,1.5" />
+          <text x="18" y="32" fill="#ef4444" fontSize="3.5" fontWeight="bold">忠孝東路四段 ✕ 封閉</text>
 
           {/* 仁愛路（替代路線） */}
-          <line x1="20" y1="62" x2="90" y2="62" stroke="#22c55e" strokeWidth="0.6" />
-          <text x="25" y="60" fill="#22c55e" fontSize="2.5">仁愛路 → 替代路線</text>
+          <line x1="15" y1="62" x2="92" y2="62" stroke="#22c55e" strokeWidth="0.9" />
+          <text x="18" y="59" fill="#22c55e" fontSize="3.5" fontWeight="bold">仁愛路四段 → 替代路線</text>
 
           {/* 市民大道（替代路線） */}
-          <line x1="20" y1="18" x2="90" y2="18" stroke="#22c55e" strokeWidth="0.6" />
-          <text x="25" y="16" fill="#22c55e" fontSize="2.5">市民大道 → 替代路線</text>
+          <line x1="15" y1="18" x2="92" y2="18" stroke="#22c55e" strokeWidth="0.9" />
+          <text x="18" y="15" fill="#22c55e" fontSize="3.5" fontWeight="bold">市民大道四段 → 替代路線</text>
 
           {/* 復興南路（南北向） */}
-          <line x1="45" y1="5" x2="45" y2="95" stroke="#94a3b8" strokeWidth="0.4" />
+          <line x1="40" y1="5" x2="40" y2="95" stroke="#94a3b8" strokeWidth="0.5" />
+          <text x="41" y="92" fill="#94a3b8" fontSize="2.5">復興南路</text>
           {/* 大安路（南北向） */}
-          <line x1="60" y1="5" x2="60" y2="95" stroke="#94a3b8" strokeWidth="0.4" />
+          <line x1="65" y1="5" x2="65" y2="95" stroke="#94a3b8" strokeWidth="0.5" />
+          <text x="66" y="92" fill="#94a3b8" fontSize="2.5">光復南路</text>
         </svg>
 
         {/* 基地台覆蓋範圍圓圈 */}
