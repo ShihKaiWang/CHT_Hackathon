@@ -352,6 +352,39 @@ function IncidentPanel() {
             <div className="text-xs text-green-400 mt-3 p-2 bg-green-500/10 border border-green-500/20 rounded-lg">
               ✅ 處理完成（耗時 {countdown} 秒 {countdown <= 60 ? '— 目標達成！' : ''}）
             </div>
+
+            {/* AI Agent 導引文字 */}
+            {result.llm_guidance && (
+              <div className="mt-3 p-4 bg-cyan-500/5 border border-cyan-500/20 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm">🤖</span>
+                  <span className="text-xs text-cyan-400 font-medium">AI Agent 導引建議（LLM 生成）</span>
+                  {result.agent_iterations && (
+                    <span className="text-xs text-slate-500">
+                      {result.agent_iterations} 輪推理
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{result.llm_guidance}</p>
+              </div>
+            )}
+
+            {/* Agent 推理過程 */}
+            {result.agent_tool_calls && result.agent_tool_calls.length > 0 && (
+              <div className="mt-2 p-3 bg-slate-900 border border-slate-700 rounded-lg">
+                <p className="text-xs text-cyan-400 font-medium mb-2">
+                  🔗 Agent 推理過程（{result.agent_tool_calls.length} 次工具呼叫）
+                </p>
+                <div className="space-y-1">
+                  {result.agent_tool_calls.map((tc, j) => (
+                    <div key={j} className="text-xs text-slate-400 flex items-start gap-1">
+                      <span className="text-green-400 flex-shrink-0">→</span>
+                      <span><span className="text-cyan-300">{tc.tool}</span>({Object.values(tc.input || {}).join(', ') || ''})</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

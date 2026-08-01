@@ -394,12 +394,16 @@ function App() {
             <HumanOverride />
             {/* 事件注入 */}
             <IncidentPanel />
-            {/* ETE + 建議書 + 簡訊 */}
-            <ETECalculation />
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <ReportDocument />
-              <CitizenSMS />
-            </div>
+            {/* ETE + 建議書 + 簡訊（事件觸發後才顯示） */}
+            {currentTime >= '22:10' && (
+              <>
+                <ETECalculation />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <ReportDocument />
+                  <CitizenSMS />
+                </div>
+              </>
+            )}
           </div>
         )}
 
