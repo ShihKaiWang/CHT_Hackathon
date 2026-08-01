@@ -143,27 +143,33 @@ def notify_incident(event_name: str, severity: str, location: str) -> bool:
     return sns_ok or line_ok
 
 
-# ============ LINE Notify ============
+# ============ LINE Messaging API ============
 
-LINE_NOTIFY_TOKEN = os.getenv("LINE_NOTIFY_TOKEN", "")
+LINE_CHANNEL_TOKEN = os.getenv("LINE_CHANNEL_TOKEN", "")
+LINE_USER_ID = os.getenv("LINE_USER_ID", "")
 
 
 def send_line_notify(message: str) -> bool:
-    """透過 LINE Notify 發送通知"""
-    if not LINE_NOTIFY_TOKEN:
-        print("[LINE] No token configured, skipping")
+    """透過 LINE Messaging API Push Message 發送通知"""
+    if not LINE_CHANNEL_TOKEN or not LINE_USER_ID:
+        print("[LINE] No token or user ID configured, skipping")
         return False
     try:
         import urllib.request
-        import urllib.parse
-        data = urllib.parse.urlencode({"message": message}).encode()
+        data = json.dumps({
+            "to": LINE_USER_ID,
+            "messages": [{"type": "text", "text": message}]
+        }).encode()
         req = urllib.request.Request(
-            "https://notify-api.line.me/api/notify",
+            "https://api.line.me/v2/bot/message/push",
             data=data,
-            headers={"Authorization": f"Bearer {LINE_NOTIFY_TOKEN}"},
+            headers={
+                "Authorization": f"Bearer {LINE_CHANNEL_TOKEN}",
+                "Content-Type": "application/json",
+            },
         )
         urllib.request.urlopen(req, timeout=10)
-        print(f"[LINE] Notify sent")
+        print(f"[LINE] Push message sent")
         return True
     except Exception as e:
         print(f"[LINE Error] {e}")
