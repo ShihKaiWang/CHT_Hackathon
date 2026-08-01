@@ -388,9 +388,8 @@ function WeatherModule({ weatherEnabled, setWeatherEnabled }) {
 
               {/* 資料來源說明 */}
               <div className="bg-slate-700/20 border border-slate-700 rounded-lg p-3 text-xs text-slate-500">
-                <p>📡 資料來源：Open-Meteo API（即時氣象資料）| 座標：台北信義區 ({TAIPEI_LAT}, {TAIPEI_LNG})</p>
+                <p>📡 資料來源：Open-Meteo API（即時氣象資料，免費無需 API Key）| 座標：台北信義區 ({TAIPEI_LAT}, {TAIPEI_LNG})</p>
                 <p className="mt-0.5">🔄 自動每 5 分鐘更新 | 容量係數公式：降雨×能見度×風速 三因子加權</p>
-                <p className="mt-0.5">☁️ AWS 部署時可改接 Amazon Location Service Weather 或中央氣象署 API</p>
               </div>
             </>
           )}
