@@ -27,9 +27,24 @@ function MultiLangReport({ incidentResult }) {
     loadReport()
   }, [])
 
-  // 事件注入後重新載入通報（取得 LLM 生成的最新多語文字）
+  // 事件注入後：優先使用 Agent 產出的多語通報
   useEffect(() => {
-    if (incidentResult) {
+    if (incidentResult?.agent_structured?.multilang) {
+      const agentML = incidentResult.agent_structured.multilang
+      setReport({
+        roaming_rate: agentML.roaming_rate || 0.45,
+        triggered: agentML.triggered !== false,
+        trigger_station: agentML.station || '',
+        reports: {
+          zh: agentML.zh || '',
+          en: agentML.en || '',
+          ja: agentML.ja || '',
+          ko: agentML.ko || '',
+        },
+        llm_generated: true,
+      })
+      setLoading(false)
+    } else if (incidentResult) {
       loadReport()
     }
   }, [incidentResult])
