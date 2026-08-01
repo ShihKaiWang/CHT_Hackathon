@@ -34,6 +34,17 @@ def handle_incident(req: IncidentRequest, user: dict = Depends(require_commander
     event_type, location, description = validate_incident_input(req.type, req.location, req.description)
     result = process_incident(event_type, location, description)
     _last_result = result
+
+    # AWS 整合：DynamoDB 持久化 + SNS 通知
+    try:
+        from services.aws_services import save_incident, notify_incident, save_agent_trace
+        save_incident(result)
+        notify_incident(result.get("event", ""), result.get("severity", ""), location)
+        if result.get("agent_tool_calls"):
+            save_agent_trace("incident_process", result["agent_tool_calls"], result.get("agent_iterations", 0), result.get("llm_guidance", "")[:200])
+    except Exception:
+        pass
+
     return result
 
 

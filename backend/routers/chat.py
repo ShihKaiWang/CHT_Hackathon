@@ -15,14 +15,23 @@ class ChatRequest(BaseModel):
 
 @router.post("/")
 def chat(req: ChatRequest):
-    """POST /api/chat/ — AI Agent 對話（含 Prompt Injection 防護）"""
+    """POST /api/chat/ — AI Agent 對話（含雙層安全防護）"""
     import os
     from middleware.security import validate_chat_input
 
-    # 輸入驗證 + 過濾
+    # 第一層：應用層 Prompt Injection 過濾
     safe_message = validate_chat_input(req.message)
     if safe_message.startswith("[已過濾]"):
         return {"reply": safe_message}
+
+    # 第二層：Bedrock Guardrail 內容安全檢查
+    try:
+        from services.aws_services import check_input_safety
+        guard_result = check_input_safety(safe_message)
+        if guard_result.get("action") == "BLOCKED":
+            return {"reply": guard_result["output"], "guardrail_blocked": True}
+    except Exception:
+        pass
 
     # Agent 模式：回傳推理過程
     use_bedrock = os.getenv("USE_BEDROCK", "false").lower() == "true"
