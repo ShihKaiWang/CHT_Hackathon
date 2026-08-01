@@ -128,18 +128,55 @@ def send_alert_notification(subject: str, message: str) -> bool:
         return False
 
 
-def notify_incident(event_name: str, severity: str, location: str) -> bool:
-    subject = f"[{severity}] 交通事件通報 — {event_name}"
+def notify_incident(event_name: str, severity: str, location: str, extra_data: dict = None) -> bool:
+    """事件發生時通知指揮官 — 包含完整分析資訊"""
+    extra = extra_data or {}
+    alternatives = extra.get("alternative_routes", [])
+    ete = extra.get("ete", {})
+    level = extra.get("level", "")
+    affected = extra.get("affected_roads", [])
+
+    alt_text = ""
+    for alt in alternatives[:3]:
+        alt_text += f"  * {alt.get('path', alt.get('name', ''))}\n"
+
+    subject = f"[{severity}] 交通事件通報 - {event_name}"
     message = (
-        f"城市應變分析 AI Agent 事件通報\n{'=' * 40}\n\n"
-        f"事件：{event_name}\n嚴重度：{severity}\n位置：{location}\n"
-        f"時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-        f"系統已自動啟動應變流程，請登入 Dashboard 查看。\n"
-        f"https://d29bomxt4wi5pg.cloudfront.net\n"
+        f"======================================\n"
+        f"  城市應變分析 AI Agent - 事件通報\n"
+        f"======================================\n\n"
+        f"事件：{event_name}\n"
+        f"位置：{location}\n"
+        f"嚴重度：{severity}（{level} 級）\n"
+        f"時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"\n"
+        f"--- AI Agent 分析結果 ---\n"
+        f"* ETE 預估恢復時間：{ete.get('ete_minutes', 'N/A')} 分鐘\n"
+        f"* 影響路段：{', '.join(affected) if affected else 'N/A'}\n"
+        f"* 替代路線：\n{alt_text if alt_text else '  (分析中)'}\n"
+        f"\n"
+        f"--- 操作連結 ---\n"
+        f"Dashboard：https://d29bomxt4wi5pg.cloudfront.net\n"
+        f"民眾端：https://d29bomxt4wi5pg.cloudfront.net/?mode=public\n"
+        f"\n"
+        f"此通報由 AI Agent 自動產出，經系統安全驗證。\n"
     )
-    # 同時發送 SNS (Email + SMS) 和 LINE Notify
+
+    line_msg = (
+        f"\n🚨 城市應變 AI Agent 通報\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📋 事件：{event_name}\n"
+        f"📍 位置：{location}\n"
+        f"⚠️ 等級：{severity}（{level} 級）\n"
+        f"⏱️ ETE：{ete.get('ete_minutes', 'N/A')} 分鐘\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🛤️ 替代路線：\n{alt_text if alt_text else '  分析中...'}"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🔗 https://d29bomxt4wi5pg.cloudfront.net\n"
+    )
+
     sns_ok = send_alert_notification(subject, message)
-    line_ok = send_line_notify(f"\n⚠️ [{severity}] {event_name}\n📍 {location}\n⏰ {datetime.now().strftime('%H:%M:%S')}\n🔗 https://d29bomxt4wi5pg.cloudfront.net")
+    line_ok = send_line_notify(line_msg)
     return sns_ok or line_ok
 
 

@@ -39,7 +39,7 @@ def handle_incident(req: IncidentRequest, user: dict = Depends(require_commander
     try:
         from services.aws_services import save_incident, notify_incident, save_agent_trace
         save_incident(result)
-        notify_incident(result.get("event", ""), result.get("severity", ""), location)
+        notify_incident(result.get("event", ""), result.get("severity", ""), location, extra_data=result)
         if result.get("agent_tool_calls"):
             save_agent_trace("incident_process", result["agent_tool_calls"], result.get("agent_iterations", 0), result.get("llm_guidance", "")[:200])
     except Exception:
