@@ -29,11 +29,26 @@ def get_multilang_report():
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    """WS /api/dashboard/ws — 即時推播"""
+    """WS /api/dashboard/ws — 即時推播（需 token + 連線數限制）"""
+    from middleware.security import verify_ws_token, ws_limiter
+
+    # 認證
+    token = websocket.query_params.get("token", "")
+    user = verify_ws_token(token)
+    if not user:
+        await websocket.close(code=4001, reason="Authentication required")
+        return
+
+    # 連線數限制
+    ip = websocket.client.host if websocket.client else "unknown"
+    if not ws_limiter.can_connect(ip):
+        await websocket.close(code=4002, reason="Too many connections from this IP")
+        return
+
+    ws_limiter.connect(ip)
     await websocket.accept()
     try:
         while True:
-            # 每 10 秒推送最新告警
             alerts = data_store.get_alerts()
             if alerts:
                 import random
@@ -43,6 +58,8 @@ async def websocket_endpoint(websocket: WebSocket):
             await asyncio.sleep(10)
     except WebSocketDisconnect:
         pass
+    finally:
+        ws_limiter.disconnect(ip)
 
 
 @router.get("/agent-patrol")
@@ -74,6 +91,12 @@ def get_crowd_density():
             row[r["Location_Name"]] = int(r["User_Count"])
         flow.append(row)
 
+    # 前值填充 flow
+    for i in range(1, len(flow)):
+        for s in stations:
+            if s not in flow[i] and s in flow[i - 1]:
+                flow[i][s] = flow[i - 1][s]
+
     # 漫遊率時序
     roaming = []
     for ts in timestamps:
@@ -86,6 +109,12 @@ def get_crowd_density():
                 pct = float(pct.replace("%", "")) / 100
             row[r["Location_Name"]] = round(float(pct), 3)
         roaming.append(row)
+
+    # 前值填充 roaming
+    for i in range(1, len(roaming)):
+        for s in stations:
+            if s not in roaming[i] and s in roaming[i - 1]:
+                roaming[i][s] = roaming[i - 1][s]
 
     # 站點清單（含顏色）
     colors = ['#f59e0b', '#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#ec4899', '#ef4444', '#84cc16']
