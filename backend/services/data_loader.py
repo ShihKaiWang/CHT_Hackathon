@@ -78,8 +78,15 @@ class DataStore:
                 match = subset[subset["Road_Name"] == name]
                 if not match.empty:
                     row[label] = int(match.iloc[0]["Vehicle_Count"])
-                # 缺值不放入（前端 Recharts 會自動跳過 undefined）
+                # 缺值不放入（稍後用前值填充）
             flow.append(row)
+
+        # 前值填充（Forward Fill）— 缺值用前一時間點的值補齊
+        all_labels = list(road_labels.values())
+        for i in range(1, len(flow)):
+            for label in all_labels:
+                if label not in flow[i] and label in flow[i - 1]:
+                    flow[i][label] = flow[i - 1][label]
 
         # 飽和度用資料最完整的時間點（路段最多的）
         ts_counts = df.groupby("Timestamp").size()
