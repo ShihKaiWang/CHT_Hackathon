@@ -145,41 +145,13 @@ function HumanOverride() {
             <h2 className="text-xl font-bold text-white">🎖️ 指揮官最終控制權</h2>
             <p className="text-sm text-slate-400 mt-1">AI 提供建議，人類做最終決定。所有 AI 決策需經指揮官審核後才會執行。</p>
           </div>
-          {/* 模式切換 */}
-          <div className="flex items-center gap-2 bg-slate-700 rounded-lg p-1">
-            <button
-              onClick={() => setMode('review')}
-              className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
-                mode === 'review' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              🔍 逐一審核
-            </button>
-            <button
-              onClick={() => setMode('auto')}
-              className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
-                mode === 'auto' ? 'bg-green-600 text-white' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              ⚡ 自動執行
-            </button>
-          </div>
         </div>
 
-        {mode === 'review' && (
-          <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
-            <p className="text-sm text-amber-300">
-              🔍 <strong>審核模式</strong>：AI 產出的所有決策需經您逐一批准才會執行。您可以批准、駁回或覆寫任何建議。
-            </p>
-          </div>
-        )}
-        {mode === 'auto' && (
-          <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
-            <p className="text-sm text-green-300">
-              ⚡ <strong>自動模式</strong>：信心度 ≥ 90% 的決策自動執行，其餘仍需人工審核。指揮官隨時可介入覆寫。
-            </p>
-          </div>
-        )}
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+          <p className="text-sm text-amber-300">
+            🔍 <strong>審核模式</strong>：AI 產出的所有決策需經您逐一批准才會執行。您可以批准、駁回或覆寫任何建議。
+          </p>
+        </div>
 
         {/* 統計 */}
         <div className="grid grid-cols-4 gap-3 mt-4">
