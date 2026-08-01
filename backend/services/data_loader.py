@@ -2,6 +2,7 @@
 資料載入層 — 讀取中華電信 5 個官方資料檔案
 適配真實資料格式
 """
+from typing import Optional
 import json
 import pandas as pd
 from pathlib import Path
@@ -196,14 +197,14 @@ class DataStore:
 
     # ============ 路網 ============
 
-    def find_road_by_id(self, segment_id: str) -> dict | None:
+    def find_road_by_id(self, segment_id: str) -> Optional[dict]:
         """依 segment_id 查找"""
         for road in self.road_network:
             if road.get("segment_id") == segment_id:
                 return road
         return None
 
-    def find_road_by_name(self, name: str) -> dict | None:
+    def find_road_by_name(self, name: str) -> Optional[dict]:
         """依路段名稱查找"""
         for road in self.road_network:
             if road.get("name") and (road["name"] in name or name in road["name"]):
