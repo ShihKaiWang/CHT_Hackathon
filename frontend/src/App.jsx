@@ -278,12 +278,12 @@ function App() {
       {loggedIn && !publicMode && (
       <>
       {/* Status Bar */}
-      <div className="status-bar">
+      <div className={`status-bar ${fullscreen ? 'hidden' : ''}`}>
         <StatusBar />
       </div>
 
       {/* 模擬時鐘控制列 */}
-      <SimClockBar />
+      {!fullscreen && <SimClockBar />}
 
       {/* Header */}
       <header className={`bg-slate-800 border-b border-slate-700 px-6 py-3 transition-all duration-300 ${fullscreen ? 'hidden' : ''}`}>
