@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useSimClock } from '../hooks/useSimClock.jsx'
+import { callSmartApp } from '../services/api'
 
 const REPORT_TYPES = [
   { id: 'traffic_jam', icon: '🚗', label: '塞車', color: 'red' },
@@ -99,6 +100,8 @@ function PublicReport() {
   const [description, setDescription] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [filter, setFilter] = useState('all')
+  const [agentResult, setAgentResult] = useState(null)
+  const [agentLoading, setAgentLoading] = useState(false)
   const { currentTime } = useSimClock()
 
   // 只顯示模擬時鐘時間之前的回報
@@ -129,8 +132,30 @@ function PublicReport() {
     setLocation('')
     setDescription('')
 
+    // Call AI Agent to analyze the report
+    callReportAgent(selectedType, location, description)
+
     // 3 秒後重置提示
     setTimeout(() => setSubmitted(false), 4000)
+  }
+
+  async function callReportAgent(type, loc, desc) {
+    setAgentLoading(true)
+    setAgentResult(null)
+    try {
+      const res = await callSmartApp('analyze_report', {
+        type,
+        location: loc,
+        description: desc,
+      })
+      if (res && Object.keys(res).length > 0) {
+        setAgentResult(res)
+      }
+    } catch (err) {
+      console.error('AI Agent analyze_report error:', err)
+    } finally {
+      setAgentLoading(false)
+    }
   }
 
   function handleUpvote(reportId) {
@@ -193,6 +218,48 @@ function PublicReport() {
             <p className="text-sm text-green-400 font-medium">回報已送出！感謝您的協助</p>
             <p className="text-xs text-slate-400">系統將交叉比對其他數據源驗證，確認後將納入決策參考</p>
           </div>
+        </div>
+      )}
+
+      {/* AI Agent 回報分析 */}
+      {agentLoading && (
+        <div className="card-glass rounded-lg p-4 flex items-center gap-3">
+          <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-cyan-500"></div>
+          <span className="text-sm text-cyan-400">AI Agent 回報分析中...</span>
+        </div>
+      )}
+      {agentResult && (
+        <div className="card-glass rounded-lg p-4 border border-cyan-500/20">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-sm">🤖</span>
+            <span className="text-sm text-cyan-400 font-medium">AI Agent 分析</span>
+            {agentResult.iterations && <span className="text-xs text-slate-500">{agentResult.iterations} 輪推理</span>}
+          </div>
+          {agentResult.verification && (
+            <div className="bg-slate-700/30 rounded p-2 text-xs text-slate-300 mb-2">
+              <span className="text-white font-medium">驗證結果：</span>
+              <span className={agentResult.verification === 'confirmed' ? 'text-green-400' : 'text-amber-400'}>
+                {agentResult.verification === 'confirmed' ? '✅ 已確認' : '⏳ ' + agentResult.verification}
+              </span>
+            </div>
+          )}
+          {agentResult.recommendation && (
+            <p className="text-xs text-green-400">💡 {agentResult.recommendation}</p>
+          )}
+          {agentResult.priority && (
+            <p className="text-xs text-amber-400 mt-1">優先度：{agentResult.priority}</p>
+          )}
+          {agentResult.summary && (
+            <p className="text-xs text-slate-300 mt-2">{agentResult.summary}</p>
+          )}
+          {agentResult.tool_calls?.length > 0 && (
+            <div className="mt-3 pt-2 border-t border-slate-700">
+              <p className="text-xs text-slate-500 mb-1">推理過程：</p>
+              {agentResult.tool_calls.map((tc, i) => (
+                <div key={i} className="text-xs text-slate-400">→ <span className="text-cyan-300">{tc.tool}</span></div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { callSmartApp } from '../services/api'
 
 // 預設地點選項
 const LOCATIONS = [
@@ -150,6 +151,8 @@ function MaaSPlanner() {
   const [sortBy, setSortBy] = useState('fastest')
   const [searched, setSearched] = useState(false)
   const [expandedRoute, setExpandedRoute] = useState(null)
+  const [agentResult, setAgentResult] = useState(null)
+  const [agentLoading, setAgentLoading] = useState(false)
 
   function handleSearch() {
     if (!origin || !destination) return
@@ -157,6 +160,23 @@ function MaaSPlanner() {
     setRoutes(results)
     setSearched(true)
     setExpandedRoute(null)
+    // Call AI Agent for route planning
+    callAgent(origin, destination)
+  }
+
+  async function callAgent(from, to) {
+    setAgentLoading(true)
+    setAgentResult(null)
+    try {
+      const res = await callSmartApp('maas_plan', { from, to })
+      if (res && Object.keys(res).length > 0) {
+        setAgentResult(res)
+      }
+    } catch (err) {
+      console.error('AI Agent maas_plan error:', err)
+    } finally {
+      setAgentLoading(false)
+    }
   }
 
   function getSortedRoutes() {
@@ -236,6 +256,47 @@ function MaaSPlanner() {
       {/* 搜尋結果 */}
       {searched && (
         <>
+          {/* AI Agent 分析 */}
+          {agentLoading && (
+            <div className="card-glass rounded-lg p-4 flex items-center gap-3">
+              <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-cyan-500"></div>
+              <span className="text-sm text-cyan-400">AI Agent 路線規劃分析中...</span>
+            </div>
+          )}
+          {agentResult && (
+            <div className="mt-4 card-glass rounded-lg p-4 border border-cyan-500/20">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-sm">🤖</span>
+                <span className="text-sm text-cyan-400 font-medium">AI Agent 分析</span>
+                {agentResult.iterations && <span className="text-xs text-slate-500">{agentResult.iterations} 輪推理</span>}
+              </div>
+              {agentResult.routes && (
+                <div className="space-y-2">
+                  {agentResult.routes.map((r, i) => (
+                    <div key={i} className="bg-slate-700/30 rounded p-2 text-xs text-slate-300">
+                      <span className="text-white font-medium">{r.mode || r.label}</span>
+                      {r.time && <span className="ml-2 text-cyan-400">{r.time}分</span>}
+                      {r.description && <p className="text-slate-400 mt-1">{r.description}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {agentResult.recommendation && (
+                <p className="text-xs text-green-400 mt-2">💡 {agentResult.recommendation}</p>
+              )}
+              {agentResult.summary && (
+                <p className="text-xs text-slate-300 mt-2">{agentResult.summary}</p>
+              )}
+              {agentResult.tool_calls?.length > 0 && (
+                <div className="mt-3 pt-2 border-t border-slate-700">
+                  <p className="text-xs text-slate-500 mb-1">推理過程：</p>
+                  {agentResult.tool_calls.map((tc, i) => (
+                    <div key={i} className="text-xs text-slate-400">→ <span className="text-cyan-300">{tc.tool}</span></div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           {/* 排序選項 */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-400">排序：</span>

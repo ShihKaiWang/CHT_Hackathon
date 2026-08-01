@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useCountUp } from '../hooks/useCountUp'
+import { callSmartApp } from '../services/api'
 
 const EVENTS = [
   {
@@ -80,6 +81,8 @@ function EventSimulator() {
   const [simPhase, setSimPhase] = useState(0)
   const [simComplete, setSimComplete] = useState(false)
   const [elapsedMin, setElapsedMin] = useState(0)
+  const [agentResult, setAgentResult] = useState(null)
+  const [agentLoading, setAgentLoading] = useState(false)
   const timerRef = useRef(null)
   const phaseRef = useRef(null)
 
@@ -89,6 +92,9 @@ function EventSimulator() {
     setSimComplete(false)
     setSimPhase(0)
     setElapsedMin(0)
+
+    // Call AI Agent for event impact analysis
+    callEventAgent(selectedEvent)
 
     // 每 2 秒推進一個階段（模擬加速）
     let phase = 0
@@ -118,6 +124,25 @@ function EventSimulator() {
     setSimComplete(false)
     setSimPhase(0)
     setElapsedMin(0)
+  }
+
+  async function callEventAgent(event) {
+    setAgentLoading(true)
+    setAgentResult(null)
+    try {
+      const res = await callSmartApp('event_impact', {
+        event_name: event.name,
+        venue: event.venue,
+        capacity: event.capacity,
+      })
+      if (res && Object.keys(res).length > 0) {
+        setAgentResult(res)
+      }
+    } catch (err) {
+      console.error('AI Agent event_impact error:', err)
+    } finally {
+      setAgentLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -316,6 +341,54 @@ function EventSimulator() {
       {/* 事前部署建議 */}
       {simComplete && selectedEvent && (
         <>
+          {/* AI Agent 分析 */}
+          {agentLoading && (
+            <div className="card-glass rounded-lg p-4 flex items-center gap-3">
+              <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-cyan-500"></div>
+              <span className="text-sm text-cyan-400">AI Agent 事件衝擊分析中...</span>
+            </div>
+          )}
+          {agentResult && (
+            <div className="card-glass rounded-lg p-4 border border-cyan-500/20">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-sm">🤖</span>
+                <span className="text-sm text-cyan-400 font-medium">AI Agent 分析</span>
+                {agentResult.iterations && <span className="text-xs text-slate-500">{agentResult.iterations} 輪推理</span>}
+              </div>
+              {agentResult.impact_analysis && (
+                <div className="space-y-2">
+                  {typeof agentResult.impact_analysis === 'string' ? (
+                    <p className="text-xs text-slate-300">{agentResult.impact_analysis}</p>
+                  ) : (
+                    Object.entries(agentResult.impact_analysis).map(([key, val], i) => (
+                      <div key={i} className="bg-slate-700/30 rounded p-2 text-xs text-slate-300">
+                        <span className="text-white font-medium">{key}：</span>
+                        <span>{typeof val === 'object' ? JSON.stringify(val) : val}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+              {agentResult.recommendations && (
+                <div className="mt-2 space-y-1">
+                  {agentResult.recommendations.map((rec, i) => (
+                    <p key={i} className="text-xs text-green-400">💡 {rec}</p>
+                  ))}
+                </div>
+              )}
+              {agentResult.summary && (
+                <p className="text-xs text-slate-300 mt-2">{agentResult.summary}</p>
+              )}
+              {agentResult.tool_calls?.length > 0 && (
+                <div className="mt-3 pt-2 border-t border-slate-700">
+                  <p className="text-xs text-slate-500 mb-1">推理過程：</p>
+                  {agentResult.tool_calls.map((tc, i) => (
+                    <div key={i} className="text-xs text-slate-400">→ <span className="text-cyan-300">{tc.tool}</span></div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <DeploymentPlan event={selectedEvent} />
           <DeploymentGantt event={selectedEvent} />
         </>

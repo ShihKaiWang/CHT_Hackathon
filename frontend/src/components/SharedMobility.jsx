@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useCountUp } from '../hooks/useCountUp'
+import { callSmartApp } from '../services/api'
 
 // YouBike 站點資料
 const YOUBIKE_STATIONS = [
@@ -95,7 +96,24 @@ function SharedMobility() {
   const [stations, setStations] = useState(YOUBIKE_STATIONS)
   const [liveMode, setLiveMode] = useState(true)
   const [dispatchAccepted, setDispatchAccepted] = useState(new Set())
+  const [agentResult, setAgentResult] = useState(null)
+  const [agentLoading, setAgentLoading] = useState(false)
   const intervalRef = useRef(null)
+
+  async function callDispatchAgent() {
+    setAgentLoading(true)
+    setAgentResult(null)
+    try {
+      const res = await callSmartApp('dispatch_plan', {})
+      if (res && Object.keys(res).length > 0) {
+        setAgentResult(res)
+      }
+    } catch (err) {
+      console.error('AI Agent dispatch_plan error:', err)
+    } finally {
+      setAgentLoading(false)
+    }
+  }
 
   // 模擬即時資料變動
   useEffect(() => {
@@ -133,17 +151,31 @@ function SharedMobility() {
       <div className="card-glass rounded-lg p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-white">🚲 共享運具即時調度</h2>
-          <button
-            onClick={() => setLiveMode(!liveMode)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
-              liveMode
-                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                : 'bg-slate-700 text-slate-400 border border-slate-600'
-            }`}
-          >
-            {liveMode && <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>}
-            {liveMode ? 'LIVE' : '暫停'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={callDispatchAgent}
+              disabled={agentLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-600/30 disabled:opacity-50"
+            >
+              {agentLoading ? (
+                <span className="w-3 h-3 border-t-2 border-cyan-400 rounded-full animate-spin"></span>
+              ) : (
+                <span>🤖</span>
+              )}
+              AI 調度分析
+            </button>
+            <button
+              onClick={() => setLiveMode(!liveMode)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
+                liveMode
+                  ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                  : 'bg-slate-700 text-slate-400 border border-slate-600'
+              }`}
+            >
+              {liveMode && <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>}
+              {liveMode ? 'LIVE' : '暫停'}
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
@@ -174,6 +206,49 @@ function SharedMobility() {
           </div>
         </div>
       </div>
+
+      {/* AI Agent 調度分析結果 */}
+      {agentLoading && (
+        <div className="card-glass rounded-lg p-4 flex items-center gap-3">
+          <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-cyan-500"></div>
+          <span className="text-sm text-cyan-400">AI Agent 調度分析中...</span>
+        </div>
+      )}
+      {agentResult && (
+        <div className="card-glass rounded-lg p-4 border border-cyan-500/20">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-sm">🤖</span>
+            <span className="text-sm text-cyan-400 font-medium">AI Agent 分析</span>
+            {agentResult.iterations && <span className="text-xs text-slate-500">{agentResult.iterations} 輪推理</span>}
+          </div>
+          {agentResult.dispatch_actions && (
+            <div className="space-y-2">
+              {agentResult.dispatch_actions.map((action, i) => (
+                <div key={i} className="bg-slate-700/30 rounded p-2 text-xs text-slate-300">
+                  <span className="text-white font-medium">{action.action || action.type}</span>
+                  {action.from && <span className="text-slate-400"> · {action.from} → {action.to}</span>}
+                  {action.quantity && <span className="text-cyan-400 ml-1">({action.quantity} 輛)</span>}
+                  {action.reason && <p className="text-slate-400 mt-1">{action.reason}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+          {agentResult.summary && (
+            <p className="text-xs text-slate-300 mt-2">{agentResult.summary}</p>
+          )}
+          {agentResult.recommendation && (
+            <p className="text-xs text-green-400 mt-2">💡 {agentResult.recommendation}</p>
+          )}
+          {agentResult.tool_calls?.length > 0 && (
+            <div className="mt-3 pt-2 border-t border-slate-700">
+              <p className="text-xs text-slate-500 mb-1">推理過程：</p>
+              {agentResult.tool_calls.map((tc, i) => (
+                <div key={i} className="text-xs text-slate-400">→ <span className="text-cyan-300">{tc.tool}</span></div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* YouBike 站點狀態 */}
       <div className="card-glass rounded-lg p-6">

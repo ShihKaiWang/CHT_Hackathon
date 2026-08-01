@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useCountUp } from '../hooks/useCountUp'
+import { callSmartApp } from '../services/api'
 
 // Open-Meteo API（免費、無需 key）
 const TAIPEI_LAT = 25.033
@@ -79,6 +80,8 @@ function WeatherModule({ weatherEnabled, setWeatherEnabled }) {
   const [loading, setLoading] = useState(false)
   const [lastUpdate, setLastUpdate] = useState(null)
   const [error, setError] = useState(null)
+  const [agentResult, setAgentResult] = useState(null)
+  const [agentLoading, setAgentLoading] = useState(false)
 
   // 取得即時天氣
   async function fetchWeather() {
@@ -97,6 +100,8 @@ function WeatherModule({ weatherEnabled, setWeatherEnabled }) {
         visibility: current.visibility, // 公尺
       })
       setLastUpdate(new Date())
+      // Auto-call AI Agent for weather impact analysis
+      callWeatherAgent(getWeatherInfo(current.weather_code).label, current.rain)
     } catch (err) {
       setError('無法取得天氣資料，請檢查網路連線')
     } finally {
@@ -111,6 +116,21 @@ function WeatherModule({ weatherEnabled, setWeatherEnabled }) {
     const timer = setInterval(fetchWeather, 5 * 60 * 1000)
     return () => clearInterval(timer)
   }, [weatherEnabled])
+
+  async function callWeatherAgent(condition, rainProb) {
+    setAgentLoading(true)
+    setAgentResult(null)
+    try {
+      const res = await callSmartApp('weather_impact', { condition, rain_prob: rainProb })
+      if (res && Object.keys(res).length > 0) {
+        setAgentResult(res)
+      }
+    } catch (err) {
+      console.error('AI Agent weather_impact error:', err)
+    } finally {
+      setAgentLoading(false)
+    }
+  }
 
   // 計算衍生值
   const weatherInfo = liveWeather ? getWeatherInfo(liveWeather.weatherCode) : null
@@ -316,6 +336,53 @@ function WeatherModule({ weatherEnabled, setWeatherEnabled }) {
                       )
                     })}
                   </div>
+                </div>
+              )}
+
+              {/* AI Agent 天氣衝擊分析 */}
+              {agentLoading && (
+                <div className="card-glass rounded-lg p-4 flex items-center gap-3">
+                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-cyan-500"></div>
+                  <span className="text-sm text-cyan-400">AI Agent 天氣衝擊分析中...</span>
+                </div>
+              )}
+              {agentResult && (
+                <div className="card-glass rounded-lg p-4 border border-cyan-500/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-sm">🤖</span>
+                    <span className="text-sm text-cyan-400 font-medium">AI Agent 分析</span>
+                    {agentResult.iterations && <span className="text-xs text-slate-500">{agentResult.iterations} 輪推理</span>}
+                  </div>
+                  {agentResult.at_risk_roads && (
+                    <div className="space-y-1 mb-2">
+                      <p className="text-xs text-slate-400 font-medium">⚠️ 高風險路段：</p>
+                      {agentResult.at_risk_roads.map((road, i) => (
+                        <div key={i} className="bg-slate-700/30 rounded p-2 text-xs text-red-300">
+                          📍 {typeof road === 'string' ? road : road.name || road.road}
+                          {road.reason && <span className="text-slate-400 ml-1">— {road.reason}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {agentResult.recommendations && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-slate-400 font-medium">建議措施：</p>
+                      {agentResult.recommendations.map((rec, i) => (
+                        <p key={i} className="text-xs text-green-400">💡 {rec}</p>
+                      ))}
+                    </div>
+                  )}
+                  {agentResult.summary && (
+                    <p className="text-xs text-slate-300 mt-2">{agentResult.summary}</p>
+                  )}
+                  {agentResult.tool_calls?.length > 0 && (
+                    <div className="mt-3 pt-2 border-t border-slate-700">
+                      <p className="text-xs text-slate-500 mb-1">推理過程：</p>
+                      {agentResult.tool_calls.map((tc, i) => (
+                        <div key={i} className="text-xs text-slate-400">→ <span className="text-cyan-300">{tc.tool}</span></div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

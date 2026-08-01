@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from routers import dashboard, incidents, chat
+from routers.auth import router as auth_router
+from middleware.security import SecurityMiddlewareV2
 
 app = FastAPI(
     title="城市應變分析 AI Agent API",
@@ -16,7 +18,10 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS 設定（允許前端跨域存取）
+# Security Middleware V2（Rate Limiting + IP 黑名單 + 降級模式 + Audit）
+app.add_middleware(SecurityMiddlewareV2)
+
+# CORS 設定
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,6 +31,7 @@ app.add_middleware(
 )
 
 # 路由掛載
+app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(incidents.router, prefix="/api/incidents", tags=["Incidents"])
 app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
@@ -33,4 +39,4 @@ app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "service": "cht-hackathon-backend"}
+    return {"status": "ok", "service": "cht-hackathon-backend", "security": "enabled"}
