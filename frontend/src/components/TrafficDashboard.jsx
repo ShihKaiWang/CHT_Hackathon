@@ -6,6 +6,7 @@ import {
 import { fetchTrafficData } from '../services/api'
 import { useCountUp } from '../hooks/useCountUp'
 import { useSimClock } from '../hooks/useSimClock.jsx'
+import { useToast } from './ToastProvider'
 
 const SATURATION_COLORS = {
   critical: '#ef4444',
@@ -92,6 +93,21 @@ function TrafficDashboard() {
   useEffect(() => {
     loadData()
   }, [])
+
+  const { addToast } = useToast()
+
+  // Auto alert when saturation >= 85%
+  useEffect(() => {
+    if (saturationData.length > 0) {
+      const criticals = saturationData.filter(d => d.saturation >= 0.95)
+      const warnings = saturationData.filter(d => d.saturation >= 0.85 && d.saturation < 0.95)
+      if (criticals.length > 0) {
+        addToast(`⚠️ ${criticals.length} 路段飽和度超過 95%（A 級癱瘓）— SOP 第 1 條觸發`, 'critical')
+      } else if (warnings.length > 0) {
+        addToast(`⚡ ${warnings.length} 路段飽和度超過 85%（B 級壅擠）— SOP 第 1 條預警`, 'critical')
+      }
+    }
+  }, [saturationData])
 
   async function loadData() {
     try {

@@ -50,11 +50,13 @@ def get_evacuation_plan(segment_id: str) -> dict:
 
         # 篩選：capacity >= 1000
         if capacity < 1000:
-            excluded.append({"name": alt_road["name"], "id": alt_id, "reason": f"容量不足（{capacity} < 1000 vph）"})
+            excluded.append({"name": alt_road["name"], "id": alt_id, "reason": f"容量不足（{capacity} < 1000 vph）（SOP 第 2 條）", "saturation": round(sat, 3)})
             continue
 
-        # 飽和度 >= 0.85 仍可用但標記壅塞
-        congested = sat >= 0.85
+        # 飽和度 >= 0.85 排除（SOP 第 1 條）
+        if sat >= 0.85:
+            excluded.append({"name": alt_road["name"], "id": alt_id, "reason": f"飽和度 {round(sat*100)}% ≥ 85% 閾值（SOP 第 1 條）", "saturation": round(sat, 3)})
+            continue
 
         valid_alternatives.append({
             "id": alt_id,
@@ -62,7 +64,7 @@ def get_evacuation_plan(segment_id: str) -> dict:
             "saturation": round(sat, 3),
             "capacity": capacity,
             "remaining": int(capacity * (1 - sat)),
-            "congested": congested,
+            "congested": False,
         })
 
     # 排序：飽和度低的優先

@@ -97,7 +97,7 @@ const TYPE_COLORS = { scan: 'text-slate-400', analyze: 'text-blue-400', predict:
 
 function ProactiveAlert() {
   const [agentLogs, setAgentLogs] = useState([])
-  const [agentRunning, setAgentRunning] = useState(false)
+  const [agentRunning, setAgentRunning] = useState(true)
   const [predictions, setPredictions] = useState(PREDICTIVE_ALERTS)
   const [anomalies, setAnomalies] = useState(ANOMALY_DETECTIONS)
   const [alertExpanded, setAlertExpanded] = useState(null)
