@@ -147,7 +147,7 @@ def run_patrol() -> dict:
 
     thoughts.append({"time": now, "type": "scan", "msg": "巡邏完成。所有數據源已掃描。"})
 
-    return {
+    result = {
         "thoughts": thoughts,
         "predictions": predictions,
         "anomalies": anomalies,
@@ -158,3 +158,16 @@ def run_patrol() -> dict:
             "anomalies_count": len(anomalies),
         }
     }
+
+    # LLM 生成分析摘要（USE_BEDROCK=true 時啟用）
+    if anomalies:
+        try:
+            from services.llm_service import generate_anomaly_summary
+            summary_text = generate_anomaly_summary(anomalies)
+            if summary_text:
+                result["llm_summary"] = summary_text
+                thoughts.append({"time": now, "type": "action", "msg": f"📝 AI 分析摘要：{summary_text[:80]}..."})
+        except Exception:
+            pass
+
+    return result

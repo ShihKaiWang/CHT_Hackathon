@@ -102,7 +102,7 @@ def process_incident(event_type: str, location: str, description: str = "") -> d
             "capacity": alt["capacity"],
         })
 
-    return {
+    result = {
         "event": f"{road_name} — {_event_type_label(event_type)}",
         "severity": severity,
         "level": level,
@@ -116,6 +116,18 @@ def process_incident(event_type: str, location: str, description: str = "") -> d
         "excluded_roads": evacuation.get("excluded", []),
         "mrt_status": mrt,
     }
+
+    # LLM 生成導引文字（USE_BEDROCK=true 時啟用）
+    try:
+        from services.llm_service import generate_routing_guidance
+        inc_info = {"description": description or _event_type_label(event_type), "location": road_name, "severity": severity}
+        guidance = generate_routing_guidance(inc_info, alternatives, ete.get("ete_minutes", 30))
+        if guidance:
+            result["llm_guidance"] = guidance
+    except Exception:
+        pass
+
+    return result
 
 
 def generate_report(result: dict) -> str:

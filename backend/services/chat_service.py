@@ -86,44 +86,30 @@ def _local_rule_answer(message: str) -> str:
             "5. 散場時 CBS 推播疏散指引（第 6 條若漫遊率觸發）"
         )
 
-    # 預設回答
+    # 預設回答（明確說明 SOP 涵蓋範圍）
     return (
-        f"根據 SOP 規範，系統正在分析您的問題：「{message}」\n\n"
-        "本系統依據以下 SOP 條款提供建議：\n"
-        "- 第 1 條：事件分級\n"
-        "- 第 2 條：主疏散規則\n"
-        "- 第 3 條：跨系統聯動\n"
-        "- 第 5 條：號誌異常處置\n"
-        "- 第 6 條：多語通報\n"
-        "- 第 7 條：ETE 計算\n\n"
-        "請提供更具體的情境或數據，以便精確回答。"
+        f"關於您的問題：「{message}」\n\n"
+        "目前 SOP 涵蓋以下情境：\n"
+        "- 第 1 條：交通擁塞級別判定（A 級 ≥0.95 / B 級 ≥0.85）\n"
+        "- 第 2 條：車禍與路障應變（主疏散路徑計算）\n"
+        "- 第 3 條：捷運與接駁分流\n"
+        "- 第 4 條：大巨蛋散場啟動\n"
+        "- 第 5 條：號誌故障應變\n"
+        "- 第 6 條：數位通報與多語化（漫遊率 ≥30%）\n"
+        "- 第 7 條：預計恢復時間 ETE 計算\n\n"
+        "請提供更具體的情境（例如路段名稱、事件類型），以便精確引用條款回答。\n"
+        "若問題超出 SOP 範圍，建議諮詢交控中心值班人員。"
     )
 
 
 def _bedrock_rag_answer(message: str) -> str:
-    """使用 AWS Bedrock Knowledge Base RAG 回答"""
+    """使用 Bedrock Claude 直接回答（SOP 作為 context）"""
     try:
-        import boto3
-
-        region = os.getenv("AWS_REGION", "us-east-1")
-        kb_id = os.getenv("BEDROCK_KB_ID", "")
-        model_id = os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-3-sonnet-20240229-v1:0")
-
-        client = boto3.client("bedrock-agent-runtime", region_name=region)
-
-        response = client.retrieve_and_generate(
-            input={"text": message},
-            retrieveAndGenerateConfiguration={
-                "type": "KNOWLEDGE_BASE",
-                "knowledgeBaseConfiguration": {
-                    "knowledgeBaseId": kb_id,
-                    "modelArn": f"arn:aws:bedrock:{region}::foundation-model/{model_id}",
-                },
-            },
-        )
-
-        return response["output"]["text"]
-
+        from services.llm_service import chat_with_sop
+        result = chat_with_sop(message)
+        if result:
+            return result
+        # LLM 回傳空值時 fallback
+        return _local_rule_answer(message)
     except Exception as e:
-        # Bedrock 失敗時 fallback 到本地規則
         return _local_rule_answer(message)

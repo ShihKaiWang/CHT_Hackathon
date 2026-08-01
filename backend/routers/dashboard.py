@@ -23,8 +23,26 @@ def get_alerts():
 
 @router.get("/multilang-report")
 def get_multilang_report():
-    """GET /api/dashboard/multilang-report — 多語通報"""
-    return data_store.get_multilang_report()
+    """GET /api/dashboard/multilang-report — 多語通報（LLM 生成多語文字）"""
+    base_report = data_store.get_multilang_report()
+
+    # 嘗試用 LLM 生成多語通報文字
+    try:
+        from services.llm_service import generate_multilang_alert
+        if base_report.get("triggered"):
+            llm_reports = generate_multilang_alert(
+                incident_desc="光復南路與忠孝東路口路面塌陷暫時封閉",
+                location="忠孝東路四段/光復南路口",
+                alternatives="市民大道或仁愛路",
+                ete=60,
+            )
+            if llm_reports:
+                base_report["reports"] = llm_reports
+                base_report["llm_generated"] = True
+    except Exception:
+        pass
+
+    return base_report
 
 
 @router.websocket("/ws")
