@@ -102,23 +102,31 @@ function App() {
     public: { label: '民眾', icon: '👥', desc: '查看公開路況、路線規劃、提交回報、語音播報' },
   }
 
-  function handleLogin(e) {
+  async function handleLogin(e) {
     e.preventDefault()
     if (userRole === 'public') {
+      try {
+        const { loginAPI } = await import('./services/api')
+        await loginAPI('public', '')
+      } catch (err) { /* 民眾模式可離線 */ }
       setLoggedIn(true)
       setPublicMode(true)
       return
     }
-    if (loginPassword === PASSWORDS[userRole]) {
+    // 指揮官：呼叫後端 API 取得 JWT
+    try {
+      const { loginAPI } = await import('./services/api')
+      await loginAPI(userRole, loginPassword)
       setLoggedIn(true)
       setLoginError('')
       setPublicMode(false)
-    } else {
+    } catch (err) {
       setLoginError('密碼錯誤，請重新輸入')
     }
   }
 
   function handleLogout() {
+    import('./services/api').then(({ logoutAPI }) => logoutAPI())
     setLoggedIn(false)
     setUserRole('')
     setLoginPassword('')

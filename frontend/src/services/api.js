@@ -13,8 +13,38 @@ const USE_MOCK = false // 切換為 false 以連接真實後端
 
 const api = axios.create({
   baseURL: API_BASE,
-  timeout: 10000,
+  timeout: 30000,
 })
+
+// ============ JWT Token 管理 ============
+
+export function setAuthToken(token) {
+  if (token) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+    sessionStorage.setItem('jwt_token', token)
+  } else {
+    delete api.defaults.headers.common['Authorization']
+    sessionStorage.removeItem('jwt_token')
+  }
+}
+
+// 頁面載入時恢復 token
+const savedToken = sessionStorage.getItem('jwt_token')
+if (savedToken) {
+  api.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`
+}
+
+// 登入 API
+export async function loginAPI(username, password) {
+  const res = await api.post('/auth/login', { username, password })
+  setAuthToken(res.data.token)
+  return res.data
+}
+
+// 登出
+export function logoutAPI() {
+  setAuthToken(null)
+}
 
 // 車流時序資料
 export async function fetchTrafficData() {
