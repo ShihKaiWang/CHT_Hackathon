@@ -255,12 +255,15 @@ function App() {
                 ← 返回指揮官模式
               </button>
             ) : <div />}
-            <button
-              onClick={handleLogout}
-              className="text-xs text-slate-400 hover:text-white bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              登出
-            </button>
+            {/* 民眾透過 ?mode=public 進入時不顯示登出（避免看到指揮官介面） */}
+            {!autoPublic && (
+              <button
+                onClick={handleLogout}
+                className="text-xs text-slate-400 hover:text-white bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                登出
+              </button>
+            )}
           </div>
           <PublicView />
         </div>
