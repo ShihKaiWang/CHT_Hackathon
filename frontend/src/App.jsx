@@ -276,7 +276,7 @@ function App() {
               </button>
             )}
           </div>
-          <PublicView />
+          <PublicView incidentResult={incidentResult} />
         </div>
       )}
 

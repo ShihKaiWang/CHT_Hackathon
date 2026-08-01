@@ -74,13 +74,47 @@ const NEARBY_TRANSIT = [
   { type: '🚌', name: '232 路公車', distance: '路口', status: '臨時改道市民大道', since: '22:15' },
 ]
 
-function PublicView() {
+function PublicView({ incidentResult }) {
   const [activeSection, setActiveSection] = useState('info') // info | route | report
   const { currentTime } = useSimClock()
 
-  // 依模擬時鐘過濾
-  const visibleIncidents = CURRENT_INCIDENTS.filter((i) => i.since <= currentTime)
-  const visibleRoutes = ALTERNATIVE_ROUTES.filter((r) => r.since <= currentTime)
+  // 從 Agent 結果提取民眾可見資訊（已經指揮官審核）
+  const s = incidentResult?.agent_structured || {}
+  const hasIncident = !!incidentResult
+
+  // 動態事件列表（從 Agent 結果產生）
+  const dynamicIncidents = hasIncident ? [{
+    id: 1,
+    title: s.situation?.event_type || incidentResult?.event || '交通事件',
+    status: '處理中',
+    severity: 'critical',
+    location: s.situation?.location || '台北市信義區',
+    since: currentTime,
+    ete: `${s.ete?.minutes || incidentResult?.ete?.ete_minutes || 60} 分鐘`,
+    description: s.situation?.description || '',
+  }] : []
+
+  // 動態替代路線（從 Agent 結果產生）
+  const dynamicRoutes = hasIncident
+    ? (s.alternatives || incidentResult?.alternative_routes || []).map((alt, i) => ({
+        id: i + 1,
+        from: s.situation?.location || '事件路段方向',
+        suggestion: `改走${alt.name || alt.path}`,
+        congestion: alt.saturation < 0.7 ? '順暢' : '壅塞',
+        congestion_color: alt.saturation < 0.7 ? 'green' : 'amber',
+        saturation: alt.saturation,
+      }))
+    : []
+
+  // 民眾導引文字（Agent 生成）
+  const guidanceText = s.guidance_text || incidentResult?.llm_guidance || ''
+
+  // 多語通報
+  const multilang = s.multilang || {}
+
+  // 沒有事件時用寫死的 fallback（SimClock 到 22:10 才顯示）
+  const visibleIncidents = hasIncident ? dynamicIncidents : CURRENT_INCIDENTS.filter((i) => i.since <= currentTime)
+  const visibleRoutes = hasIncident ? dynamicRoutes : ALTERNATIVE_ROUTES.filter((r) => r.since <= currentTime)
   const visibleTransit = NEARBY_TRANSIT.filter((t) => t.since <= currentTime)
 
   return (
@@ -188,6 +222,29 @@ function PublicView() {
       {/* 替代路線建議 */}
       <div className="space-y-3">
         <h2 className="text-base font-semibold text-white px-1">🛤️ 建議替代路線</h2>
+
+        {/* AI Agent 導引（指揮官審核後發布） */}
+        {hasIncident && guidanceText && (
+          <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full">🤖 AI 導引 · 已由指揮官審核</span>
+            </div>
+            <p className="text-sm text-slate-200 leading-relaxed">{guidanceText}</p>
+          </div>
+        )}
+
+        {/* 多語通報（如果有） */}
+        {hasIncident && multilang.zh && (
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+            <p className="text-xs text-blue-400 font-medium mb-2">🌐 多語通報</p>
+            <div className="space-y-1.5 text-xs">
+              {multilang.zh && <p className="text-slate-300">🇹🇼 {multilang.zh}</p>}
+              {multilang.en && <p className="text-slate-400">🇺🇸 {multilang.en}</p>}
+              {multilang.ja && <p className="text-slate-400">🇯🇵 {multilang.ja}</p>}
+              {multilang.ko && <p className="text-slate-400">🇰🇷 {multilang.ko}</p>}
+            </div>
+          </div>
+        )}
         {visibleRoutes.map((route) => (
           <div key={route.id} className="bg-slate-800 border border-slate-700 rounded-xl p-4">
             <div className="flex items-center justify-between">
