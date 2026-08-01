@@ -243,7 +243,9 @@ def get_current_user(request: Request) -> Optional[dict]:
 
 
 def require_auth(request: Request) -> dict:
-    """強制要求認證（任何角色）"""
+    """強制要求認證（任何角色）— DEMO_MODE 跳過"""
+    if os.getenv("DEMO_MODE", "false").lower() == "true":
+        return {"sub": "demo-commander", "role": "commander"}
     user = get_current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required. Please login first.")
