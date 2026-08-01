@@ -13,11 +13,11 @@ const SOP_MAPPING = {
   weather: { clause: '第 5 條', label: '異常處置', color: 'purple' },
 }
 
-function IncidentPanel() {
+function IncidentPanel({ incidentResult, setIncidentResult }) {
   const [selectedType, setSelectedType] = useState('')
   const [location, setLocation] = useState('')
   const [description, setDescription] = useState('')
-  const [result, setResult] = useState(null)
+  const result = incidentResult
   const [processing, setProcessing] = useState(false)
   const [countdown, setCountdown] = useState(0)
   const [countdownActive, setCountdownActive] = useState(false)
@@ -94,7 +94,7 @@ function IncidentPanel() {
     if (!selectedType || !location) return
 
     setProcessing(true)
-    setResult(null)
+    setIncidentResult(null)
     setCountdown(0)
     setCountdownActive(true)
 
@@ -104,7 +104,7 @@ function IncidentPanel() {
         location,
         description,
       })
-      setResult(response)
+      setIncidentResult(response)
     } catch (err) {
       console.error('事件處理失敗:', err)
     } finally {

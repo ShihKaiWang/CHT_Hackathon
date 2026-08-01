@@ -58,6 +58,7 @@ function App() {
   const [systemSub, setSystemSub] = useState('security')
   const [fullscreen, setFullscreen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
+  const [incidentResult, setIncidentResult] = useState(null) // 事件處理結果（跨 tab 保留）
   const [publicMode, setPublicMode] = useState(autoPublic)
   const [loggedIn, setLoggedIn] = useState(autoPublic)
   const [userRole, setUserRole] = useState(autoPublic ? 'public' : '')
@@ -393,7 +394,7 @@ function App() {
             {/* 指揮官控制權置頂 */}
             <HumanOverride />
             {/* 事件注入 */}
-            <IncidentPanel />
+            <IncidentPanel incidentResult={incidentResult} setIncidentResult={setIncidentResult} />
             {/* ETE + 建議書 + 簡訊（事件觸發後才顯示） */}
             {currentTime >= '22:10' && (
               <>
@@ -411,6 +412,25 @@ function App() {
         {activeTab === 'notify' && (
           <div className="space-y-6">
             <MultiLangReport />
+            {/* 事件產出的民眾通報（從事件應變帶過來） */}
+            {incidentResult && incidentResult.llm_guidance && (
+              <div className="card-glass rounded-lg p-6">
+                <h2 className="text-lg font-semibold text-white mb-3">📋 事件應變產出 — 民眾導引通報</h2>
+                <p className="text-xs text-slate-400 mb-3">以下內容由 AI Agent 於事件處理時自動產出，可一鍵發佈：</p>
+                <div className="bg-cyan-500/5 border border-cyan-500/20 rounded-lg p-4 mb-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-sm">🤖</span>
+                    <span className="text-xs text-cyan-400 font-medium">AI Agent 生成</span>
+                  </div>
+                  <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{incidentResult.llm_guidance}</p>
+                </div>
+                <div className="bg-slate-700/50 rounded-lg p-3 text-xs text-slate-400">
+                  <p>• 事件：{incidentResult.event}</p>
+                  <p>• 替代路線：{incidentResult.alternative_routes?.map(r => r.path).join('、')}</p>
+                  <p>• ETE：{incidentResult.ete?.ete_minutes} 分鐘</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
