@@ -164,15 +164,10 @@ function TrafficMap() {
           style={{ height: '100%', width: '100%' }}
           zoomControl={true}
         >
-          {/* 衛星圖像圖磚 */}
+          {/* 深色乾淨街道圖 */}
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> | Imagery &copy; Esri'
-            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-          />
-          {/* 路名標註覆蓋層（讓衛星圖上也看得到路名） */}
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png"
-            opacity={0.8}
+            attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> | &copy; <a href="https://carto.com/">CARTO</a>'
+            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
           />
 
           {/* 事件觸發時自動飛到事件地點 */}
@@ -218,18 +213,18 @@ function TrafficMap() {
             pathOptions={{ color: '#d97706', weight: 6, dashArray: '8, 6', opacity: 0.85 }}
           />
 
-          {/* 基地台覆蓋圈 */}
+          {/* 基地台覆蓋圈（縮小 + 淡化，避免干擾路線） */}
           {BASE_STATIONS.map((station) => (
             <Circle
               key={station.id}
               center={station.pos}
-              radius={280}
+              radius={150}
               pathOptions={{
                 color: station.roaming >= 0.3 ? '#d97706' : '#0891b2',
                 fillColor: station.roaming >= 0.3 ? '#fbbf24' : '#22d3ee',
-                fillOpacity: 0.2,
-                weight: 2.5,
-                dashArray: station.roaming >= 0.3 ? '' : '5, 5',
+                fillOpacity: 0.1,
+                weight: 1.5,
+                dashArray: '4, 4',
               }}
             >
               <Popup>
