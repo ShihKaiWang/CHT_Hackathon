@@ -27,7 +27,14 @@ function ChatDrawer({ isOpen, onClose }) {
 
     try {
       const response = await sendChatMessage(userMessage)
-      setMessages((prev) => [...prev, { role: 'assistant', content: response.reply }])
+      const agentMsg = { role: 'assistant', content: response.reply }
+      // 如果有 Agent 推理過程，附加顯示
+      if (response.agent_tool_calls && response.agent_tool_calls.length > 0) {
+        agentMsg.toolCalls = response.agent_tool_calls
+        agentMsg.iterations = response.agent_iterations
+        agentMsg.mode = response.mode
+      }
+      setMessages((prev) => [...prev, agentMsg])
     } catch (err) {
       setMessages((prev) => [
         ...prev,
@@ -91,6 +98,22 @@ function ChatDrawer({ isOpen, onClose }) {
                 }`}
               >
                 <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                {/* Agent 推理過程 */}
+                {msg.toolCalls && msg.toolCalls.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-slate-600">
+                    <p className="text-xs text-cyan-400 font-medium mb-1">
+                      🤖 Agent 推理（{msg.iterations} 輪，{msg.toolCalls.length} 次工具呼叫）
+                    </p>
+                    <div className="space-y-1">
+                      {msg.toolCalls.map((tc, j) => (
+                        <div key={j} className="text-xs text-slate-400 flex items-start gap-1">
+                          <span className="text-green-400 flex-shrink-0">→</span>
+                          <span><span className="text-cyan-300">{tc.tool}</span>({Object.values(tc.input || {}).join(', ') || ''})</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ))}
