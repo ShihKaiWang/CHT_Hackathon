@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "資安合規檢查",
+      "trigger": "PreToolUse",
+      "description": "在寫入檔案前檢查是否符合資安規範：無硬編碼密碼、無暴露 API Key、正確使用環境變數",
+      "matcher": "fs_write|str_replace|fs_append",
+      "action": {
+        "type": "agent",
+        "prompt": "在寫入程式碼前，請確認以下資安規範：1. 不可硬編碼密碼或 API Key（須使用環境變數） 2. 不可將敏感資訊寫入前端程式碼 3. SQL/NoSQL 查詢必須參數化 4. 使用者輸入必須驗證與消毒 5. JWT Secret 必須來自環境變數 6. 不可 disable CORS 或安全中介層。若發現違規，請提醒修正。"
+      }
+    }
+  ]
+}

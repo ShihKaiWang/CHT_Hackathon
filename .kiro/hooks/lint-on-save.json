@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "前端 Lint 檢查",
+      "trigger": "PostFileSave",
+      "description": "當前端 .jsx/.js 檔案儲存時自動執行 ESLint 檢查程式碼品質",
+      "matcher": "\\.(jsx|js)$",
+      "action": {
+        "type": "command",
+        "command": "npx eslint --no-error-on-unmatched-pattern --max-warnings 5 --format compact"
+      }
+    }
+  ]
+}

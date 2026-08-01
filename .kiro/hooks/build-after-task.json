@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "任務完成後 Build 驗證",
+      "trigger": "PostTaskExec",
+      "description": "Spec 任務完成後自動執行前端 build 驗證，確保程式碼無編譯錯誤",
+      "action": {
+        "type": "command",
+        "command": "cd C:\\Users\\劉炤輝\\Downloads\\CHT_Hackathon\\frontend && npx vite build --mode production 2>&1 | Select-Object -Last 5"
+      }
+    }
+  ]
+}

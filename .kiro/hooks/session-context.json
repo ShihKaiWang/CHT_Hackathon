@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "載入專案上下文",
+      "trigger": "SessionStart",
+      "description": "Session 開始時自動載入專案上下文資訊",
+      "action": {
+        "type": "command",
+        "command": "echo [Session Started] Loading project context: CHT Hackathon Team 9 - Smart Traffic Command Dashboard. AWS deployment: CloudFront + EC2. Branch: feat/frontend-ui"
+      }
+    }
+  ]
+}
