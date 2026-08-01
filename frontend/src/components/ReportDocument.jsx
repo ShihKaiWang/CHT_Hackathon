@@ -71,8 +71,34 @@ const REPORT_DATA = {
   ],
 }
 
-function ReportDocument() {
+function ReportDocument({ incidentResult }) {
   const [expanded, setExpanded] = useState(true)
+
+  // Use dynamic data from incidentResult if available, otherwise fallback to hardcoded
+  const agent = incidentResult?.agent_structured
+  const data = agent ? {
+    event: {
+      event_id: agent.situation?.event_id || REPORT_DATA.event.event_id,
+      description: agent.situation?.description || REPORT_DATA.event.description,
+      time: agent.situation?.time || REPORT_DATA.event.time,
+      sop_clauses: agent.situation?.sop_clauses || REPORT_DATA.event.sop_clauses,
+      source: agent.situation?.source || REPORT_DATA.event.source,
+    },
+    classification: {
+      level: agent.classification?.level || REPORT_DATA.classification.level,
+      criteria: agent.classification?.criteria || REPORT_DATA.classification.criteria,
+      traffic_data: agent.classification?.traffic_data || REPORT_DATA.classification.traffic_data,
+    },
+    routes: {
+      primary: agent.alternatives?.primary || REPORT_DATA.routes.primary,
+      secondary: agent.alternatives?.secondary || REPORT_DATA.routes.secondary,
+      excluded: agent.alternatives?.excluded || REPORT_DATA.routes.excluded,
+    },
+    signals: agent.sop_actions?.signals || REPORT_DATA.signals,
+    coordination: agent.sop_actions?.coordination || REPORT_DATA.coordination,
+    ete: agent.ete || null,
+    guidance_text: agent.guidance_text || null,
+  } : REPORT_DATA
 
   function handlePrint() {
     window.print()
@@ -84,7 +110,7 @@ function ReportDocument() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `交控中心建議書_${REPORT_DATA.event.event_id}.md`
+    a.download = `交控中心建議書_${data.event.event_id}.md`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -94,52 +120,52 @@ function ReportDocument() {
 
 ## 一、事件辨識
 
-- **事件編號**：${REPORT_DATA.event.event_id}
-- **事件描述**：${REPORT_DATA.event.description}
-- **發生時間**：${REPORT_DATA.event.time}
-- **對應 SOP**：${REPORT_DATA.event.sop_clauses.join('、')}
-- **來源**：${REPORT_DATA.event.source}
+- **事件編號**：${data.event.event_id}
+- **事件描述**：${data.event.description}
+- **發生時間**：${data.event.time}
+- **對應 SOP**：${data.event.sop_clauses.join('、')}
+- **來源**：${data.event.source}
 
 ## 二、交通分級判定
 
-**判定結果：${REPORT_DATA.classification.level} 級**
+**判定結果：${data.classification.level} 級**
 
 判定依據：
-${REPORT_DATA.classification.criteria.map((c) => `- ${c}`).join('\n')}
+${data.classification.criteria.map((c) => `- ${c}`).join('\n')}
 
 數據引用：
-- 飽和度：${(REPORT_DATA.classification.traffic_data.saturation * 100).toFixed(0)}%
-- 車流量：${REPORT_DATA.classification.traffic_data.flow_rate}/${REPORT_DATA.classification.traffic_data.capacity} 車/時
-- 影響路段：${REPORT_DATA.classification.traffic_data.affected_roads} 段
+- 飽和度：${(data.classification.traffic_data.saturation * 100).toFixed(0)}%
+- 車流量：${data.classification.traffic_data.flow_rate}/${data.classification.traffic_data.capacity} 車/時
+- 影響路段：${data.classification.traffic_data.affected_roads} 段
 
 ## 三、替代路徑建議
 
 ### 主要疏散路線
-- **路線**：${REPORT_DATA.routes.primary.name}
-- **ETE**：${REPORT_DATA.routes.primary.ete}
-- **飽和度**：${REPORT_DATA.routes.primary.saturation}
-- **選用理由**：${REPORT_DATA.routes.primary.reason}
+- **路線**：${data.routes.primary.name}
+- **ETE**：${data.routes.primary.ete}
+- **飽和度**：${data.routes.primary.saturation}
+- **選用理由**：${data.routes.primary.reason}
 
 ### 次要替代路線
-- **路線**：${REPORT_DATA.routes.secondary.name}
-- **ETE**：${REPORT_DATA.routes.secondary.ete}
-- **飽和度**：${REPORT_DATA.routes.secondary.saturation}
-- **選用理由**：${REPORT_DATA.routes.secondary.reason}
+- **路線**：${data.routes.secondary.name}
+- **ETE**：${data.routes.secondary.ete}
+- **飽和度**：${data.routes.secondary.saturation}
+- **選用理由**：${data.routes.secondary.reason}
 
 ### 排除路線
-${REPORT_DATA.routes.excluded.map((r) => `- **${r.name}**：${r.reason}`).join('\n')}
+${data.routes.excluded.map((r) => `- **${r.name}**：${r.reason}`).join('\n')}
 
 ## 四、號誌調整建議
 
 | 路口 | 調整內容 | 時段 |
 |------|---------|------|
-${REPORT_DATA.signals.map((s) => `| ${s.intersection} | ${s.action} | ${s.period} |`).join('\n')}
+${data.signals.map((s) => `| ${s.intersection} | ${s.action} | ${s.period} |`).join('\n')}
 
 ## 五、跨系統聯動
 
 | 單位 | 請求動作 | 依據 SOP |
 |------|---------|----------|
-${REPORT_DATA.coordination.map((c) => `| ${c.target} | ${c.action} | ${c.sop} |`).join('\n')}
+${data.coordination.map((c) => `| ${c.target} | ${c.action} | ${c.sop} |`).join('\n')}
 
 ---
 *產出時間：${new Date().toLocaleString('zh-TW')} ｜ 系統自動生成*
@@ -152,7 +178,7 @@ ${REPORT_DATA.coordination.map((c) => `| ${c.target} | ${c.action} | ${c.sop} |`
         <div>
           <h2 className="text-xl font-bold text-white">📄 交控中心建議書</h2>
           <p className="text-xs text-slate-400 mt-1">
-            事件 {REPORT_DATA.event.event_id} ｜ {REPORT_DATA.event.time}
+            事件 {data.event.event_id} ｜ {data.event.time}
           </p>
         </div>
         <div className="flex gap-2">
@@ -187,19 +213,19 @@ ${REPORT_DATA.coordination.map((c) => `| ${c.target} | ${c.action} | ${c.sop} |`
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
               <div>
                 <span className="text-slate-400">事件編號：</span>
-                <span className="text-white font-mono">{REPORT_DATA.event.event_id}</span>
+                <span className="text-white font-mono">{data.event.event_id}</span>
               </div>
               <div>
                 <span className="text-slate-400">發生時間：</span>
-                <span className="text-white">{REPORT_DATA.event.time}</span>
+                <span className="text-white">{data.event.time}</span>
               </div>
               <div className="md:col-span-2">
                 <span className="text-slate-400">事件描述：</span>
-                <span className="text-white">{REPORT_DATA.event.description}</span>
+                <span className="text-white">{data.event.description}</span>
               </div>
               <div className="md:col-span-2">
                 <span className="text-slate-400">對應 SOP：</span>
-                <span className="text-amber-400">{REPORT_DATA.event.sop_clauses.join('、')}</span>
+                <span className="text-amber-400">{data.event.sop_clauses.join('、')}</span>
               </div>
             </div>
           </section>
@@ -211,26 +237,26 @@ ${REPORT_DATA.coordination.map((c) => `| ${c.target} | ${c.action} | ${c.sop} |`
             </h3>
             <div className="flex items-center gap-3 mb-3">
               <span className="px-3 py-1 bg-red-500/20 border border-red-500/50 text-red-400 text-lg font-bold rounded-lg">
-                {REPORT_DATA.classification.level} 級
+                {data.classification.level} 級
               </span>
               <span className="text-sm text-slate-300">最高嚴重等級</span>
             </div>
             <div className="space-y-1 text-sm">
-              {REPORT_DATA.classification.criteria.map((c, i) => (
+              {data.classification.criteria.map((c, i) => (
                 <p key={i} className="text-slate-300">• {c}</p>
               ))}
             </div>
             <div className="mt-3 grid grid-cols-3 gap-3">
               <div className="bg-slate-700/50 rounded p-2 text-center">
-                <p className="text-lg font-bold text-red-400">{(REPORT_DATA.classification.traffic_data.saturation * 100).toFixed(0)}%</p>
+                <p className="text-lg font-bold text-red-400">{(data.classification.traffic_data.saturation * 100).toFixed(0)}%</p>
                 <p className="text-xs text-slate-400">飽和度</p>
               </div>
               <div className="bg-slate-700/50 rounded p-2 text-center">
-                <p className="text-lg font-bold text-white">{REPORT_DATA.classification.traffic_data.flow_rate}</p>
+                <p className="text-lg font-bold text-white">{data.classification.traffic_data.flow_rate}</p>
                 <p className="text-xs text-slate-400">車流量/時</p>
               </div>
               <div className="bg-slate-700/50 rounded p-2 text-center">
-                <p className="text-lg font-bold text-amber-400">{REPORT_DATA.classification.traffic_data.affected_roads}</p>
+                <p className="text-lg font-bold text-amber-400">{data.classification.traffic_data.affected_roads}</p>
                 <p className="text-xs text-slate-400">影響路段</p>
               </div>
             </div>
@@ -245,22 +271,22 @@ ${REPORT_DATA.coordination.map((c) => `| ${c.target} | ${c.action} | ${c.sop} |`
               <div className="bg-green-500/5 border border-green-500/20 rounded-lg p-3">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-medium text-green-400">🥇 主要疏散路線</span>
-                  <span className="text-xs text-green-400">ETE {REPORT_DATA.routes.primary.ete}</span>
+                  <span className="text-xs text-green-400">ETE {data.routes.primary.ete}</span>
                 </div>
-                <p className="text-sm text-white">{REPORT_DATA.routes.primary.name}</p>
-                <p className="text-xs text-slate-400 mt-1">理由：{REPORT_DATA.routes.primary.reason}</p>
+                <p className="text-sm text-white">{data.routes.primary.name}</p>
+                <p className="text-xs text-slate-400 mt-1">理由：{data.routes.primary.reason}</p>
               </div>
               <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-3">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-medium text-blue-400">🥈 次要替代路線</span>
-                  <span className="text-xs text-blue-400">ETE {REPORT_DATA.routes.secondary.ete}</span>
+                  <span className="text-xs text-blue-400">ETE {data.routes.secondary.ete}</span>
                 </div>
-                <p className="text-sm text-white">{REPORT_DATA.routes.secondary.name}</p>
-                <p className="text-xs text-slate-400 mt-1">理由：{REPORT_DATA.routes.secondary.reason}</p>
+                <p className="text-sm text-white">{data.routes.secondary.name}</p>
+                <p className="text-xs text-slate-400 mt-1">理由：{data.routes.secondary.reason}</p>
               </div>
               <div className="mt-2">
                 <p className="text-xs text-slate-400 mb-1">排除路線：</p>
-                {REPORT_DATA.routes.excluded.map((r, i) => (
+                {data.routes.excluded.map((r, i) => (
                   <p key={i} className="text-xs text-red-400">✕ {r.name}：{r.reason}</p>
                 ))}
               </div>
@@ -282,7 +308,7 @@ ${REPORT_DATA.coordination.map((c) => `| ${c.target} | ${c.action} | ${c.sop} |`
                   </tr>
                 </thead>
                 <tbody>
-                  {REPORT_DATA.signals.map((s, i) => (
+                  {data.signals.map((s, i) => (
                     <tr key={i} className="border-b border-slate-700/50">
                       <td className="py-2 text-white">{s.intersection}</td>
                       <td className="py-2 text-slate-300">{s.action}</td>
@@ -309,7 +335,7 @@ ${REPORT_DATA.coordination.map((c) => `| ${c.target} | ${c.action} | ${c.sop} |`
                   </tr>
                 </thead>
                 <tbody>
-                  {REPORT_DATA.coordination.map((c, i) => (
+                  {data.coordination.map((c, i) => (
                     <tr key={i} className="border-b border-slate-700/50">
                       <td className="py-2 text-white">{c.target}</td>
                       <td className="py-2 text-slate-300">{c.action}</td>
@@ -320,6 +346,26 @@ ${REPORT_DATA.coordination.map((c) => `| ${c.target} | ${c.action} | ${c.sop} |`
               </table>
             </div>
           </section>
+
+          {/* ETE 區段（動態資料時顯示） */}
+          {data.ete && (
+            <section className="border border-slate-700 rounded-lg p-4">
+              <h3 className="text-base font-semibold text-blue-400 mb-3 border-b border-slate-700 pb-2">
+                六、ETE 預估
+              </h3>
+              <p className="text-sm text-slate-300">{typeof data.ete === 'string' ? data.ete : JSON.stringify(data.ete)}</p>
+            </section>
+          )}
+
+          {/* 導引文字（動態資料時顯示） */}
+          {data.guidance_text && (
+            <section className="border border-slate-700 rounded-lg p-4">
+              <h3 className="text-base font-semibold text-blue-400 mb-3 border-b border-slate-700 pb-2">
+                七、民眾導引
+              </h3>
+              <p className="text-sm text-slate-300 whitespace-pre-wrap">{data.guidance_text}</p>
+            </section>
+          )}
 
           {/* 簽章行 */}
           <div className="text-xs text-slate-500 border-t border-slate-700 pt-3 flex items-center justify-between">

@@ -13,11 +13,8 @@ import ChatDrawer from './components/ChatDrawer'
 import PublicView from './components/PublicView'
 import EventSimulator from './components/EventSimulator'
 import WeatherModule from './components/WeatherModule'
-import MaaSPlanner from './components/MaaSPlanner'
-import SharedMobility from './components/SharedMobility'
 import ProactiveAlert from './components/ProactiveAlert'
 import PublicReport from './components/PublicReport'
-import RiskPredictionMap from './components/RiskPredictionMap'
 import CitizenSMS from './components/CitizenSMS'
 import SecurityModule from './components/SecurityModule'
 import HumanOverride from './components/HumanOverride'
@@ -36,11 +33,8 @@ const TABS = [
 
 // 智慧應用子分類
 const EXTEND_SUBTABS = [
-  { id: 'maas', label: '🚌 智慧出行' },
-  { id: 'shared', label: '🚲 運具調度' },
   { id: 'simulator', label: '🏟️ 活動模擬' },
   { id: 'weather', label: '🌧️ 天氣連動' },
-  { id: 'riskmap', label: '🔮 風險預判' },
   { id: 'crowdreport', label: '📢 公眾回報' },
 ]
 
@@ -56,7 +50,7 @@ function App() {
   const autoPublic = urlParams.get('mode') === 'public'
 
   const [activeTab, setActiveTab] = useState('overview')
-  const [extendSub, setExtendSub] = useState('maas')
+  const [extendSub, setExtendSub] = useState('simulator')
   const [systemSub, setSystemSub] = useState('security')
   const [fullscreen, setFullscreen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
@@ -402,8 +396,8 @@ function App() {
               <>
                 <ETECalculation />
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <ReportDocument />
-                  <CitizenSMS />
+                  <ReportDocument incidentResult={incidentResult} />
+                  <CitizenSMS incidentResult={incidentResult} />
                 </div>
               </>
             )}
@@ -440,11 +434,8 @@ function App() {
         {activeTab === 'extend' && (
           <div>
             <SubTabs tabs={EXTEND_SUBTABS} active={extendSub} onChange={setExtendSub} />
-            {extendSub === 'maas' && <MaaSPlanner />}
-            {extendSub === 'shared' && <SharedMobility />}
             {extendSub === 'simulator' && <EventSimulator />}
             {extendSub === 'weather' && <WeatherModule weatherEnabled={weatherEnabled} setWeatherEnabled={setWeatherEnabled} />}
-            {extendSub === 'riskmap' && <RiskPredictionMap />}
             {extendSub === 'crowdreport' && <PublicReport />}
           </div>
         )}

@@ -55,21 +55,27 @@ const SMS_DATA = {
   ],
 }
 
-function CitizenSMS() {
+function CitizenSMS({ incidentResult }) {
   const [selectedLang, setSelectedLang] = useState('zh')
   const [viewMode, setViewMode] = useState('sms') // sms | cms
   const [exportFormat, setExportFormat] = useState(null)
 
-  const currentMsg = SMS_DATA.messages[selectedLang]
+  // Use dynamic multilang data if available, otherwise fallback to hardcoded SMS_DATA
+  const multilang = incidentResult?.agent_structured?.multilang
+  const smsMessages = multilang || SMS_DATA.messages
+  const triggerData = SMS_DATA.trigger
+  const checklistData = SMS_DATA.checklist
+
+  const currentMsg = smsMessages[selectedLang] || smsMessages.zh || Object.values(smsMessages)[0]
 
   function handleExportJSON() {
     const exportData = {
       event_id: 'EVT-2026-0724-001',
-      triggered_by: SMS_DATA.trigger.condition,
-      roaming_rate: SMS_DATA.trigger.roaming_rate,
+      triggered_by: triggerData.condition,
+      roaming_rate: triggerData.roaming_rate,
       timestamp: new Date().toISOString(),
       messages: Object.fromEntries(
-        Object.entries(SMS_DATA.messages).map(([lang, data]) => [
+        Object.entries(smsMessages).map(([lang, data]) => [
           lang,
           { sms: data.sms, cms: data.cms },
         ])
@@ -91,7 +97,7 @@ function CitizenSMS() {
     window.speechSynthesis.cancel()
     const langCodes = { zh: 'zh-TW', en: 'en-US', ja: 'ja-JP', ko: 'ko-KR' }
     const utterance = new SpeechSynthesisUtterance(currentMsg.sms)
-    utterance.lang = langCodes[selectedLang]
+    utterance.lang = langCodes[selectedLang] || 'zh-TW'
     utterance.rate = 0.85
     window.speechSynthesis.speak(utterance)
   }
@@ -133,16 +139,16 @@ function CitizenSMS() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400">觸發條件：</span>
-            <span className="text-xs text-white">{SMS_DATA.trigger.condition}</span>
+            <span className="text-xs text-white">{triggerData.condition}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400">觸發站點：</span>
-            <span className="text-xs text-white">{SMS_DATA.trigger.station}</span>
+            <span className="text-xs text-white">{triggerData.station}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400">漫遊率：</span>
             <span className="text-xs text-amber-400 font-bold">
-              {(SMS_DATA.trigger.roaming_rate * 100).toFixed(0)}% ≥ {(SMS_DATA.trigger.threshold * 100).toFixed(0)}%
+              {(triggerData.roaming_rate * 100).toFixed(0)}% ≥ {(triggerData.threshold * 100).toFixed(0)}%
             </span>
           </div>
           <div className="flex items-center justify-between">
@@ -157,7 +163,7 @@ function CitizenSMS() {
       {/* 語言選擇 + 格式切換 */}
       <div className="flex items-center justify-between">
         <div className="flex gap-2">
-          {Object.entries(SMS_DATA.messages).map(([code, { lang, flag }]) => (
+          {Object.entries(smsMessages).map(([code, { lang, flag }]) => (
             <button
               key={code}
               onClick={() => setSelectedLang(code)}
@@ -197,7 +203,7 @@ function CitizenSMS() {
           <div className="flex items-center gap-2 mb-3">
             <span className="text-lg">{currentMsg.flag}</span>
             <span className="text-sm font-medium text-white">{currentMsg.lang} — 手機簡訊格式</span>
-            <span className="text-xs text-slate-500 ml-auto">{currentMsg.charCount} 字</span>
+            <span className="text-xs text-slate-500 ml-auto">{currentMsg.charCount || currentMsg.sms?.length || 0} 字</span>
           </div>
           <div className="bg-slate-800 rounded-lg p-4 border border-slate-600">
             <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
@@ -224,12 +230,12 @@ function CitizenSMS() {
       <div className="bg-slate-900 border border-slate-700 rounded-xl p-4">
         <h3 className="text-sm font-semibold text-slate-300 mb-3">全語言版本對照</h3>
         <div className="space-y-2">
-          {Object.entries(SMS_DATA.messages).map(([code, data]) => (
+          {Object.entries(smsMessages).map(([code, data]) => (
             <div key={code} className="bg-slate-800 rounded-lg p-3">
               <div className="flex items-center gap-2 mb-1">
                 <span>{data.flag}</span>
                 <span className="text-xs text-slate-400">{data.lang}</span>
-                <span className="text-xs text-slate-600 ml-auto">{data.charCount}字</span>
+                <span className="text-xs text-slate-600 ml-auto">{data.charCount || data.sms?.length || 0}字</span>
               </div>
               <p className="text-xs text-slate-300 line-clamp-2">{data.sms}</p>
             </div>
@@ -243,7 +249,7 @@ function CitizenSMS() {
           訊息要點確認（命題要求）
         </h3>
         <div className="space-y-2">
-          {SMS_DATA.checklist.map((item, i) => (
+          {checklistData.map((item, i) => (
             <div key={i} className="flex items-center gap-3">
               <span className="text-green-400">✓</span>
               <span className="text-xs text-slate-400 w-24 flex-shrink-0">{item.item}：</span>
