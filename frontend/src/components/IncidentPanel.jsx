@@ -450,18 +450,55 @@ function IncidentPanel({ incidentResult, setIncidentResult }) {
               <div className="text-xs text-green-400 p-2 bg-green-500/10 border border-green-500/20 rounded-lg">
                 ✅ 處理完成（{countdown} 秒 {countdown <= 60 ? '— 目標達成！' : ''}）
               </div>
-              <button
-                onClick={() => {
-                  const text = result.agent_structured
-                    ? JSON.stringify(result.agent_structured, null, 2)
-                    : result.llm_guidance || JSON.stringify(result, null, 2)
-                  navigator.clipboard.writeText(text)
-                  alert('報告已複製到剪貼簿！')
-                }}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg transition-colors"
-              >
-                📄 匯出報告
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const data = result.agent_structured || result
+                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `incident-report-${Date.now()}.json`
+                    a.click()
+                    URL.revokeObjectURL(url)
+                  }}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg transition-colors"
+                >
+                  📄 JSON
+                </button>
+                <button
+                  onClick={() => {
+                    const s = result.agent_structured || {}
+                    let md = `# 交控中心應變報告\n\n`
+                    md += `## 情況分析\n- 事件類型：${s.situation?.event_type || result.event || ''}\n- 位置：${s.situation?.location || ''}\n- 描述：${s.situation?.description || ''}\n- 影響範圍：${s.situation?.affected_scope || ''}\n\n`
+                    md += `## 級別判定\n- 等級：${s.classification?.level || result.level || ''} 級\n- 飽和度：${s.classification?.saturation ? (s.classification.saturation * 100).toFixed(0) + '%' : ''}\n- 依據：${s.classification?.basis || ''}\n\n`
+                    md += `## 替代路線\n`
+                    ;(s.alternatives || result.alternative_routes || []).forEach((alt, i) => {
+                      md += `${i + 1}. ${alt.name || alt.path}（飽和度 ${alt.saturation ? (alt.saturation * 100).toFixed(0) + '%' : ''}，容量 ${alt.capacity || ''} vph）\n`
+                    })
+                    md += `\n## ETE 預估\n- 預計恢復：${s.ete?.minutes || result.ete?.ete_minutes || ''} 分鐘\n- 公式：${s.ete?.formula || result.ete?.formula || ''}\n- 解釋：${s.ete?.explanation || ''}\n\n`
+                    if (s.multilang?.triggered) {
+                      md += `## 多語通報\n- 🇹🇼 ${s.multilang.zh || ''}\n- 🇺🇸 ${s.multilang.en || ''}\n- 🇯🇵 ${s.multilang.ja || ''}\n- 🇰🇷 ${s.multilang.ko || ''}\n\n`
+                    }
+                    if (s.sop_actions?.length) {
+                      md += `## SOP 行動方案\n`
+                      s.sop_actions.forEach((a) => { md += `- [${a.priority}] ${a.action}（${a.unit}）— ${a.sop_clause}\n` })
+                      md += `\n`
+                    }
+                    md += `## 民眾導引\n${s.guidance_text || result.llm_guidance || ''}\n`
+                    const blob = new Blob([md], { type: 'text/markdown' })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `incident-report-${Date.now()}.md`
+                    a.click()
+                    URL.revokeObjectURL(url)
+                  }}
+                  className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded-lg transition-colors"
+                >
+                  📝 Markdown
+                </button>
+              </div>
             </div>
           </div>
         )}

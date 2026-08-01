@@ -185,7 +185,7 @@ function MultiLangReport({ incidentResult }) {
 
       {/* === 第二排：受影響範圍 + 疏散路線 === */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <AffectedAreaMap />
+        <AffectedAreaMap incidentResult={incidentResult} />
 
         {/* 疏散路線建議 */}
         <div className="bg-slate-800 rounded-lg p-6">
