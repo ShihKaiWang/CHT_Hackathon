@@ -61,7 +61,29 @@ function App() {
   const [loginError, setLoginError] = useState('')
   const [weatherEnabled, setWeatherEnabled] = useState(false)
   const { addToast } = useToast()
-  const { setOnEvent } = useSimClock()
+  const { setOnEvent, currentTime } = useSimClock()
+  const [pendingDecision, setPendingDecision] = useState(null)
+
+  // 事件觸發時間點 → 顯示待審核通知
+  const DECISION_TRIGGERS = {
+    '22:10': '🚨 AI 產出 2 項決策待審核：路線封閉 + 號誌調整',
+    '22:20': '🚨 AI 產出 2 項決策待審核：跨系統聯動 + 多語通報',
+    '22:30': '🚨 AI 產出 1 項決策待審核：人工指揮派遣',
+  }
+
+  // 監聽時鐘，觸發待審核提示
+  useEffect(() => {
+    if (DECISION_TRIGGERS[currentTime] && activeTab !== 'response') {
+      setPendingDecision(DECISION_TRIGGERS[currentTime])
+    }
+  }, [currentTime])
+
+  function handleGoToDecision() {
+    setActiveTab('response')
+    setPendingDecision(null)
+    // 滾動到頂部讓 HumanOverride 可見
+    window.scrollTo(0, 0)
+  }
 
   // 模擬時鐘事件觸發 → 彈 Toast
   useEffect(() => {
@@ -313,6 +335,22 @@ function App() {
 
       {/* Main Content */}
       <main className={`flex-1 bg-slate-900 transition-all duration-300 ${fullscreen ? 'p-4' : 'p-6'}`}>
+
+        {/* 待審核決策浮動通知 */}
+        {pendingDecision && (
+          <div className="fixed bottom-6 right-6 z-50 animate-bounce">
+            <button
+              onClick={handleGoToDecision}
+              className="flex items-center gap-3 px-5 py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl shadow-2xl shadow-red-500/40 border border-red-400/30 transition-all max-w-sm"
+            >
+              <span className="text-2xl">⚠️</span>
+              <div className="text-left">
+                <p className="text-sm font-bold">{pendingDecision}</p>
+                <p className="text-xs text-red-200 mt-0.5">點擊前往審核 →</p>
+              </div>
+            </button>
+          </div>
+        )}
 
         {/* ===== 1. 即時態勢 ===== */}
         {activeTab === 'overview' && (
