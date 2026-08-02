@@ -89,11 +89,13 @@ function NotificationDispatch({ incidentResult }) {
   const [dispatching, setDispatching] = useState(false)
   const [dispatched, setDispatched] = useState(false)
 
-  // 當 Agent 推薦更新時，自動勾選
+  // 當 Agent 推薦更新時，自動勾選 + 重置發送狀態
   useEffect(() => {
     if (recommendedIds.length > 0) {
       setSelectedAgencies(recommendedIds)
     }
+    setDispatched(false)
+    setDispatching(false)
   }, [incidentResult])
 
   function toggleAgency(id) {
