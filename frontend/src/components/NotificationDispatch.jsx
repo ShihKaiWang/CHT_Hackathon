@@ -21,14 +21,59 @@ const ALL_AGENCIES = [
 ]
 
 function NotificationDispatch({ incidentResult }) {
+  // Demo 事件 → 對應通報單位的 fallback 對照表
+  const DEMO_DISPATCH_FALLBACK = {
+    'road_collapse': {
+      agencies: [
+        { name: '工務局搶修組', action: '路面修復、管線檢查', priority: 'P0' },
+        { name: '警察局', action: '封路管制、交通疏導', priority: 'P0' },
+        { name: '自來水公司', action: '確認管線狀態', priority: 'P1' },
+        { name: '瓦斯公司', action: '確認瓦斯管線安全', priority: 'P1' },
+      ],
+      signal: { action: '封閉雙向車道，周邊 3 路口全面重配時相，替代幹道綠燈 +40%', duration: '120+ 分鐘' },
+      handling_time: '120 分鐘',
+    },
+    'crowd_surge': {
+      agencies: [
+        { name: '消防局救護車', action: '傷患救助、緊急送醫', priority: 'P0' },
+        { name: '警察局', action: '人潮管制、現場封鎖', priority: 'P0' },
+        { name: '台北捷運公司', action: '加開班次、疏散引導', priority: 'P0' },
+      ],
+      signal: { action: '捷運站周邊出口方向綠燈 +30%，限制車輛進入', duration: '40 分鐘' },
+      handling_time: '40 分鐘',
+    },
+    'signal_failure': {
+      agencies: [
+        { name: '交通局號誌維修組', action: '緊急搶修號誌設備', priority: 'P0' },
+        { name: '警察局', action: '路口手動指揮交通', priority: 'P0' },
+        { name: '台電', action: '確認供電狀態', priority: 'P1' },
+      ],
+      signal: { action: '故障路口切閃光黃燈，鄰近路口綠燈補償 +15%', duration: '45 分鐘' },
+      handling_time: '45 分鐘',
+    },
+  }
+
   // Agent 推薦的單位（從 incidentResult.agent_structured.dispatch.agencies 取得）
-  const agentRecommended = incidentResult?.agent_structured?.dispatch?.agencies || []
-  const incidentType = incidentResult?.agent_structured?.dispatch?.incident_type || incidentResult?.agent_structured?.situation?.event_type || ''
-  const signalAdj = incidentResult?.agent_structured?.dispatch?.signal_adjustment
-  const handlingTime = incidentResult?.agent_structured?.dispatch?.handling_time
+  let agentRecommended = incidentResult?.agent_structured?.dispatch?.agencies || []
+  let incidentType = incidentResult?.agent_structured?.dispatch?.incident_type || incidentResult?.agent_structured?.situation?.event_type || ''
+
+  // Fallback：如果 Agent 沒回傳 dispatch，用事件類型對照表
+  const eventType = incidentResult?.event?.toLowerCase() || ''
+  let fallbackKey = ''
+  if (eventType.includes('塌陷') || eventType.includes('collapse')) fallbackKey = 'road_collapse'
+  else if (eventType.includes('推擠') || eventType.includes('crowd') || eventType.includes('人群')) fallbackKey = 'crowd_surge'
+  else if (eventType.includes('號誌') || eventType.includes('signal') || eventType.includes('故障')) fallbackKey = 'signal_failure'
+
+  if (agentRecommended.length === 0 && fallbackKey && DEMO_DISPATCH_FALLBACK[fallbackKey]) {
+    const fb = DEMO_DISPATCH_FALLBACK[fallbackKey]
+    agentRecommended = fb.agencies
+    if (!incidentType) incidentType = fallbackKey
+  }
+
+  const signalAdj = incidentResult?.agent_structured?.dispatch?.signal_adjustment || (fallbackKey ? DEMO_DISPATCH_FALLBACK[fallbackKey]?.signal : null)
+  const handlingTime = incidentResult?.agent_structured?.dispatch?.handling_time || (fallbackKey ? DEMO_DISPATCH_FALLBACK[fallbackKey]?.handling_time : '')
   const eventLocation = incidentResult?.agent_structured?.situation?.location || incidentResult?.event?.split('—')?.[0]?.trim() || '事故地點'
   const eventDesc = incidentResult?.agent_structured?.situation?.description || incidentResult?.event || ''
-
   // 寬鬆匹配：只要 agent name 的任何部分包含在 ALL_AGENCIES name 裡（或反過來）
   const recommendedIds = agentRecommended.map(a => {
     const agentName = a.name || ''
