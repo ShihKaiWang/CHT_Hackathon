@@ -9,8 +9,10 @@ from services.data_loader import data_store
 from services.sop_engine import classify_event, calculate_ete, check_mrt_trigger, check_multilang_trigger
 
 USE_BEDROCK = os.getenv("USE_BEDROCK", "false").lower() == "true"
-BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-4-20250514-v1:0")
+AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
+GUARDRAIL_ID = os.getenv("GUARDRAIL_ID", "")
+GUARDRAIL_VERSION = os.getenv("GUARDRAIL_VERSION", "1")
 
 _client = None
 MAX_ITERATIONS = 8
@@ -31,7 +33,8 @@ TOOLS = [
     {"toolSpec": {"name": "get_alternative_routes", "description": "查詢受影響路段的替代路線，含飽和度和容量。", "inputSchema": {"json": {"type": "object", "properties": {"road_name": {"type": "string", "description": "受影響路段名稱"}}, "required": ["road_name"]}}}},
     {"toolSpec": {"name": "calculate_ete", "description": "計算 ETE（預計交通恢復時間），回傳分鐘數和公式。", "inputSchema": {"json": {"type": "object", "properties": {"severity": {"type": "string", "description": "嚴重度：Critical/High/Medium/Low"}, "road_name": {"type": "string", "description": "受影響路段名稱"}}, "required": ["severity", "road_name"]}}}},
     {"toolSpec": {"name": "check_crowd_density", "description": "查詢基地台漫遊率，判斷是否觸發多語通報（>=30%）。", "inputSchema": {"json": {"type": "object", "properties": {"station_name": {"type": "string", "description": "站名，留空回傳全部"}}, "required": []}}}},
-    {"toolSpec": {"name": "check_sop_rules", "description": "查詢 SOP 規則，可用條款編號或關鍵字。", "inputSchema": {"json": {"type": "object", "properties": {"query": {"type": "string", "description": "條款編號或關鍵字"}}, "required": ["query"]}}}},
+    {"toolSpec": {"name": "search_sop_knowledge_base", "description": "從 SOP 知識庫中語意搜索相關規則和處置方式。使用此工具查詢 SOP 條款、處置步驟、觸發條件等。", "inputSchema": {"json": {"type": "object", "properties": {"query": {"type": "string", "description": "搜索問題，例如「路面塌陷應變步驟」、「多語通報觸發條件」"}}, "required": ["query"]}}}},
+    {"toolSpec": {"name": "check_sop_rules", "description": "直接查詢 SOP 規則全文，可用條款編號或關鍵字。", "inputSchema": {"json": {"type": "object", "properties": {"query": {"type": "string", "description": "條款編號或關鍵字"}}, "required": ["query"]}}}},
     {"toolSpec": {"name": "get_live_incidents", "description": "查詢即時事件清單。", "inputSchema": {"json": {"type": "object", "properties": {}, "required": []}}}},
     {"toolSpec": {"name": "classify_traffic_level", "description": "根據飽和度判定級別：A級>=0.95、B級>=0.85。", "inputSchema": {"json": {"type": "object", "properties": {"saturation_score": {"type": "number", "description": "飽和度(0-1)"}}, "required": ["saturation_score"]}}}},
     {"toolSpec": {"name": "generate_multilang_alert", "description": "產出中英日韓四語緊急通報。", "inputSchema": {"json": {"type": "object", "properties": {"incident_description": {"type": "string", "description": "事件描述"}, "location": {"type": "string", "description": "位置"}, "alternative_routes": {"type": "string", "description": "替代路線"}}, "required": ["incident_description", "location"]}}}},
@@ -41,7 +44,32 @@ TOOLS = [
 # ============ 工具執行 ============
 
 def _execute_tool(tool_name: str, tool_input: dict) -> str:
-    if tool_name == "check_road_saturation":
+    if tool_name == "search_sop_knowledge_base":
+        query = tool_input.get("query", "")
+        kb_id = os.getenv("BEDROCK_KB_ID", "")
+        if not kb_id:
+            # Fallback to local SOP text search
+            return _execute_tool("check_sop_rules", {"query": query})
+        try:
+            import boto3
+            kb_client = boto3.client("bedrock-agent-runtime", region_name=AWS_REGION)
+            response = kb_client.retrieve(
+                knowledgeBaseId=kb_id,
+                retrievalQuery={"text": query},
+                retrievalConfiguration={"vectorSearchConfiguration": {"numberOfResults": 5}},
+            )
+            results = []
+            for r in response.get("retrievalResults", []):
+                text = r.get("content", {}).get("text", "")
+                score = r.get("score", 0)
+                source = r.get("location", {}).get("s3Location", {}).get("uri", "")
+                results.append({"text": text, "score": round(score, 3), "source": source.split("/")[-1] if source else ""})
+            return json.dumps(results, ensure_ascii=False)
+        except Exception as e:
+            # Fallback to local
+            return _execute_tool("check_sop_rules", {"query": query})
+
+    elif tool_name == "check_road_saturation":
         road_name = tool_input.get("road_name", "")
         traffic_data = data_store.get_traffic_timeseries()
         saturation = traffic_data.get("saturation", [])
@@ -176,13 +204,19 @@ def run_agent(user_message: str, context: str = "") -> dict:
 
     for iteration in range(MAX_ITERATIONS):
         try:
-            response = client.converse(
+            kwargs = dict(
                 modelId=BEDROCK_MODEL_ID,
                 messages=messages,
                 system=[{"text": system_text}],
                 toolConfig={"tools": TOOLS},
                 inferenceConfig={"maxTokens": 2048, "temperature": 0.2},
             )
+            if GUARDRAIL_ID:
+                kwargs["guardrailConfig"] = {
+                    "guardrailIdentifier": GUARDRAIL_ID,
+                    "guardrailVersion": GUARDRAIL_VERSION,
+                }
+            response = client.converse(**kwargs)
         except Exception as e:
             return {"reply": f"[Agent Error] {e}", "tool_calls": tool_call_log, "iterations": iteration}
 
@@ -193,6 +227,10 @@ def run_agent(user_message: str, context: str = "") -> dict:
         if stop_reason == "end_turn":
             final_text = "".join(b["text"] for b in output.get("content", []) if "text" in b)
             return {"reply": final_text, "tool_calls": tool_call_log, "iterations": iteration + 1}
+
+        if stop_reason == "guardrail_intervened":
+            final_text = "".join(b["text"] for b in output.get("content", []) if "text" in b)
+            return {"reply": final_text or "⚠️ 安全護欄：此問題不在交通應變範圍內。", "tool_calls": tool_call_log, "iterations": iteration + 1, "guardrail": True}
 
         if stop_reason == "tool_use":
             tool_results = []

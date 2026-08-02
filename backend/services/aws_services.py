@@ -6,11 +6,11 @@ import os
 import json
 from datetime import datetime
 
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
 DYNAMODB_TABLE = os.getenv("DYNAMODB_TABLE", "cht-hackathon-events")
 SNS_TOPIC_ARN = os.getenv("SNS_TOPIC_ARN", "arn:aws:sns:us-east-1:714134783639:cht-hackathon-alerts")
-GUARDRAIL_ID = os.getenv("GUARDRAIL_ID", "71wdn9xn9mc5")
-GUARDRAIL_VERSION = os.getenv("GUARDRAIL_VERSION", "1")
+GUARDRAIL_ID = os.getenv("GUARDRAIL_ID", "")
+GUARDRAIL_VERSION = os.getenv("GUARDRAIL_VERSION", "DRAFT")
 
 _dynamo = None
 _sns = None
@@ -227,6 +227,9 @@ def get_parameter(name: str, default: str = "") -> str:
 # ============ Bedrock Guardrails ============
 
 def apply_guardrail(text: str, source: str = "INPUT") -> dict:
+    if not GUARDRAIL_ID:
+        # Guardrail 未設定，直接通過
+        return {"action": "PASS", "output": text}
     try:
         response = _get_bedrock().apply_guardrail(
             guardrailIdentifier=GUARDRAIL_ID,

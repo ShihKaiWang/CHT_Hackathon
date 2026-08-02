@@ -8,8 +8,10 @@ from typing import Optional
 from services.data_loader import data_store
 
 USE_BEDROCK = os.getenv("USE_BEDROCK", "false").lower() == "true"
-BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-3-haiku-20240307-v1:0")
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
+AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
+GUARDRAIL_ID = os.getenv("GUARDRAIL_ID", "")
+GUARDRAIL_VERSION = os.getenv("GUARDRAIL_VERSION", "1")
 
 _client = None
 
@@ -29,7 +31,7 @@ def invoke_llm(system_prompt: str, user_message: str, max_tokens: int = 1024) ->
 
     try:
         client = _get_client()
-        response = client.converse(
+        kwargs = dict(
             modelId=BEDROCK_MODEL_ID,
             messages=[
                 {"role": "user", "content": [{"text": user_message}]}
@@ -37,6 +39,15 @@ def invoke_llm(system_prompt: str, user_message: str, max_tokens: int = 1024) ->
             system=[{"text": system_prompt}],
             inferenceConfig={"maxTokens": max_tokens, "temperature": 0.3},
         )
+        if GUARDRAIL_ID:
+            kwargs["guardrailConfig"] = {
+                "guardrailIdentifier": GUARDRAIL_ID,
+                "guardrailVersion": GUARDRAIL_VERSION,
+            }
+        response = client.converse(**kwargs)
+        # 檢查是否被 Guardrail 攔截
+        if response.get("stopReason") == "guardrail_intervened":
+            return response["output"]["message"]["content"][0]["text"]
         return response["output"]["message"]["content"][0]["text"]
     except Exception as e:
         print(f"[LLM Error] {e}")

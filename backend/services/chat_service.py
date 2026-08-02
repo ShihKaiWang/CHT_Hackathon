@@ -11,9 +11,24 @@ USE_BEDROCK = os.getenv("USE_BEDROCK", "false").lower() == "true"
 
 
 def answer_question(message: str) -> str:
-    """回答使用者問題"""
+    """回答使用者問題（含 Guardrails 安全過濾）"""
     if USE_BEDROCK:
-        return _bedrock_rag_answer(message)
+        # 輸入安全檢查
+        from services.aws_services import check_input_safety, check_output_safety
+        input_check = check_input_safety(message)
+        if input_check["action"] == "BLOCKED":
+            return f"⚠️ 安全過濾：{input_check['output']}"
+
+        # 取得 AI 回答
+        answer = _bedrock_rag_answer(message)
+
+        # 輸出安全檢查
+        output_check = check_output_safety(answer)
+        if output_check["action"] == "BLOCKED":
+            return f"⚠️ 安全過濾：{output_check['output']}"
+
+        return answer
+
     return _local_rule_answer(message)
 
 
