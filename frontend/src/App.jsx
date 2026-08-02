@@ -113,10 +113,11 @@ function App() {
             const { processIncident } = await import('./services/api')
             const result = await processIncident(inc)
             // 把舊事件推進歷史，新事件取代
-            setIncidentResult((prev) => {
-              if (prev) setIncidentHistory((h) => [prev, ...h])
-              return result
+            setIncidentHistory((h) => {
+              const prev = incidentResult
+              return prev ? [prev, ...h] : h
             })
+            setIncidentResult(result)
           } catch (err) {
             console.error('Auto process incident failed:', err)
           }
