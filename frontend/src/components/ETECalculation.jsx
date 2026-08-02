@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-function ETECalculation() {
+function ETECalculation({ incidentResult }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState(0)
@@ -23,9 +23,26 @@ function ETECalculation() {
   async function fetchETE() {
     setLoading(true)
     try {
-      const res = await fetch('/api/dashboard/ete')
-      const json = await res.json()
-      setData(json)
+      if (incidentResult && incidentResult.ete) {
+        const ete = incidentResult.ete
+        const severity = incidentResult.severity || 'Critical'
+        const desc = incidentResult.agent_structured?.situation?.description || incidentResult.event || ''
+        const level = incidentResult.level || (ete.avg_saturation >= 0.95 ? 'A' : ete.avg_saturation >= 0.85 ? 'B' : 'normal')
+        setData({
+          ete: ete,
+          level: level,
+          severity: severity,
+          incident_desc: desc,
+          excluded_roads: [],
+          selected_roads: (incidentResult.alternative_routes || []).slice(0, 3).map((r, i) => ({
+            id: `alt-${i}`, name: r.path || r.name || '', saturation: r.saturation || 0.6
+          })),
+        })
+      } else {
+        const res = await fetch('/api/dashboard/ete')
+        const json = await res.json()
+        setData(json)
+      }
       setStep(0)
       setAutoPlay(true)
     } catch (err) {
