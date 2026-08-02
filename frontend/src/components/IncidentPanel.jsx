@@ -401,6 +401,35 @@ function IncidentPanel({ incidentResult, setIncidentResult }) {
               </div>
             )}
 
+            {/* 通報派遣（dispatch_to_agency 結果） */}
+            {result.agent_structured?.dispatch && (
+              <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-lg p-3">
+                <h3 className="text-sm font-medium text-indigo-400 mb-2">📞 通報派遣</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">通報單位：</p>
+                    <div className="space-y-1">
+                      {result.agent_structured.dispatch.agencies?.map((agency, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs">
+                          <span className={`px-1.5 py-0.5 rounded font-bold ${agency.priority === 'P0' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'}`}>{agency.priority}</span>
+                          <span className="text-white">{agency.name}</span>
+                          <span className="text-slate-400">— {agency.action}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">號誌調整：</p>
+                    <div className="bg-slate-800 rounded p-2 text-xs text-slate-300">
+                      <p>{result.agent_structured.dispatch.signal_adjustment?.action}</p>
+                      <p className="text-amber-400 mt-1">持續：{result.agent_structured.dispatch.signal_adjustment?.duration}</p>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-2">預估處理時間：<span className="text-white">{result.agent_structured.dispatch.handling_time}</span></p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* SOP 行動方案 */}
             {result.agent_structured?.sop_actions?.length > 0 && (
               <div className="bg-slate-700/50 border border-slate-600 rounded-lg p-3">

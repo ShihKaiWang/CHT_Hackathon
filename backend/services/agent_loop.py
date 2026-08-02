@@ -415,6 +415,12 @@ JSON 結構如下：
   "sop_actions": [
     {"priority": "P0", "action": "行動內容", "unit": "執行單位", "sop_clause": "第X條"}
   ],
+  "dispatch": {
+    "incident_type": "事故類型代碼",
+    "agencies": [{"name": "單位名稱", "action": "具體任務", "priority": "P0/P1"}],
+    "signal_adjustment": {"action": "號誌調整描述", "duration": "持續時間"},
+    "handling_time": "預估處理時間"
+  },
   "guidance_text": "面向民眾的導引文字（100字內）"
 }
 
@@ -429,7 +435,13 @@ JSON 結構如下：
         f"- 類型：{event_type}\n"
         f"- 位置：{location}\n"
         f"- 描述：{description}\n\n"
-        f"請依序呼叫工具查詢後，以嚴格 JSON 格式回傳結果。"
+        f"請依序執行：\n"
+        f"1. 判定事故類型並呼叫 dispatch_to_agency 取得通報單位和號誌建議\n"
+        f"2. 查詢路段飽和度\n"
+        f"3. 查詢替代路線\n"
+        f"4. 計算 ETE\n"
+        f"5. 查詢漫遊率判斷是否需要多語通報\n"
+        f"6. 以嚴格 JSON 格式回傳結果（包含 dispatch 欄位）"
     )
 
     result = run_agent(prompt, context=STRUCTURED_PROMPT)
