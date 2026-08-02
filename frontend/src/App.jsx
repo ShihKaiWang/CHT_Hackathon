@@ -16,6 +16,7 @@ import WeatherModule from './components/WeatherModule'
 import ProactiveAlert from './components/ProactiveAlert'
 import PublicReport from './components/PublicReport'
 import CitizenSMS from './components/CitizenSMS'
+import NotificationDispatch from './components/NotificationDispatch'
 import SecurityModule from './components/SecurityModule'
 import HumanOverride from './components/HumanOverride'
 import SimClockBar from './components/SimClockBar'
@@ -502,6 +503,7 @@ function App() {
                 </div>
               </div>
             )}
+            {incidentResult && <NotificationDispatch />}
             <MultiLangReport incidentResult={incidentResult} />
             {/* 事件產出的民眾通報（從事件應變帶過來） */}
             {incidentResult && incidentResult.llm_guidance && (
