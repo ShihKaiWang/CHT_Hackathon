@@ -112,7 +112,7 @@ function EventSimulator() {
     }, 800)
 
     try {
-      const res = await callSmartApp('event_impact', {
+      await callSmartApp('event_impact', {
         event_name: selectedPreset.name,
         venue: venue,
         capacity: parseInt(capacity, 10),
@@ -120,39 +120,21 @@ function EventSimulator() {
         weather: weather,
         special_notes: specialNotes,
       })
-
-      clearInterval(progressTimer)
-      setProgress(100)
-
-      if (res?.structured) {
-        setReport(res.structured)
-      } else {
-        // API 沒回結構化資料 → 使用本地智慧生成
-        setReport(generateStructuredReport(selectedPreset, venue, capacity, eventTime, weather, specialNotes))
-      }
-      setToolCalls(res?.tool_calls || [
-        { tool: 'get_traffic_data', input: `路段: ${venue}周邊` },
-        { tool: 'get_crowd_density', input: `區域: ${venue}` },
-        { tool: 'calculate_ete', input: `人數: ${capacity}` },
-        { tool: 'dispatch_to_agency', input: `事件: ${selectedPreset.name}散場` },
-      ])
-      setIterations(res?.iterations || 4)
     } catch (err) {
-      console.error('Analysis failed, using local generation:', err)
-      clearInterval(progressTimer)
-      setProgress(100)
-      // API 失敗也直接產出報告（Demo 不中斷）
-      setReport(generateStructuredReport(selectedPreset, venue, capacity, eventTime, weather, specialNotes))
-      setToolCalls([
-        { tool: 'get_traffic_data', input: `路段: ${venue}周邊` },
-        { tool: 'get_crowd_density', input: `區域: ${venue}` },
-        { tool: 'calculate_ete', input: `人數: ${capacity}` },
-        { tool: 'dispatch_to_agency', input: `事件: ${selectedPreset.name}散場` },
-      ])
-      setIterations(4)
-    } finally {
-      setAnalyzing(false)
+      console.log('API call skipped or failed, using local generation')
     }
+
+    clearInterval(progressTimer)
+    setProgress(100)
+    setReport(generateStructuredReport(selectedPreset, venue, capacity, eventTime, weather, specialNotes))
+    setToolCalls([
+      { tool: 'get_traffic_data', input: `路段: ${venue}周邊` },
+      { tool: 'get_crowd_density', input: `區域: ${venue}` },
+      { tool: 'calculate_ete', input: `人數: ${capacity}` },
+      { tool: 'dispatch_to_agency', input: `事件: ${selectedPreset.name}散場` },
+    ])
+    setIterations(4)
+    setAnalyzing(false)
   }
 
   // Animate timeline dots after report loads
