@@ -55,7 +55,8 @@ function App() {
   const [systemSub, setSystemSub] = useState('security')
   const [fullscreen, setFullscreen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
-  const [incidentResult, setIncidentResult] = useState(null) // 事件處理結果（跨 tab 保留）
+  const [incidentResult, setIncidentResult] = useState(null) // 當前事件（最新的）
+  const [incidentHistory, setIncidentHistory] = useState([]) // 事件歷史（所有已處理的）
   const [publicMode, setPublicMode] = useState(autoPublic)
   const [loggedIn, setLoggedIn] = useState(autoPublic)
   const [userRole, setUserRole] = useState(autoPublic ? 'public' : '')
@@ -109,7 +110,11 @@ function App() {
           try {
             const { processIncident } = await import('./services/api')
             const result = await processIncident(inc)
-            setIncidentResult(result)
+            // 把舊事件推進歷史，新事件取代
+            setIncidentResult((prev) => {
+              if (prev) setIncidentHistory((h) => [prev, ...h])
+              return result
+            })
           } catch (err) {
             console.error('Auto process incident failed:', err)
           }
