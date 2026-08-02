@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import TrafficDashboard from './components/TrafficDashboard'
 import AlertList from './components/AlertList'
 import CrowdDensityChart from './components/CrowdDensityChart'
@@ -88,9 +88,33 @@ function App() {
   }
 
   // 模擬時鐘事件觸發 → 彈 Toast
+  // 事件觸發對照（SimClock 到達時間時自動處理）
+  const INCIDENT_MAP = {
+    'TPE_2026_ACC_001': { type: 'road_collapse', location: '光復南路與忠孝東路口南側', description: '地下管線爆裂導致路面塌陷並引發三車連環追撞，光復南路南下全線封鎖' },
+    'TPE_2026_EVT_002': { type: 'crowd_surge', location: '捷運國父紀念館站5號出口', description: '散場人群推擠受傷，救護車佔用單向車道' },
+    'TPE_2026_EVT_003': { type: 'signal_failure', location: '信義威秀/ATT4FUN周邊', description: '信義區部分路段號誌失效，需改由人工交通指揮' },
+  }
+
+  const autoProcessedRef = useRef(new Set())
+
   useEffect(() => {
-    setOnEvent((event) => {
+    setOnEvent(async (event) => {
       addToast(`[${event.time}] ${event.message}`, 'critical')
+
+      // 自動觸發 Agent 分析（每個事件只處理一次）
+      if (event.eventId && !autoProcessedRef.current.has(event.eventId)) {
+        autoProcessedRef.current.add(event.eventId)
+        const inc = INCIDENT_MAP[event.eventId]
+        if (inc) {
+          try {
+            const { processIncident } = await import('./services/api')
+            const result = await processIncident(inc)
+            setIncidentResult(result)
+          } catch (err) {
+            console.error('Auto process incident failed:', err)
+          }
+        }
+      }
     })
   }, [setOnEvent, addToast])
 
