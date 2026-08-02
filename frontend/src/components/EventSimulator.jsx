@@ -1,749 +1,578 @@
-import { useState, useEffect, useRef } from 'react'
-import { useCountUp } from '../hooks/useCountUp'
+import { useState, useEffect } from 'react'
 import { callSmartApp } from '../services/api'
 
-const EVENTS = [
-  {
-    id: 'concert',
-    name: '演唱會',
-    icon: '🎤',
-    venue: '台北大巨蛋',
-    capacity: 50000,
-    duration: '3 小時',
-    exitTime: 15, // 散場所需分鐘
-    impactRadius: '1.5 km',
-    peakExitRate: 8000, // 人/分鐘（高峰）
-  },
-  {
-    id: 'newyear',
-    name: '跨年煙火',
-    icon: '🎆',
-    venue: '台北 101 廣場',
-    capacity: 300000,
-    duration: '30 分鐘',
-    exitTime: 45,
-    impactRadius: '3 km',
-    peakExitRate: 25000,
-  },
-  {
-    id: 'baseball',
-    name: '棒球賽',
-    icon: '⚾',
-    venue: '台北大巨蛋',
-    capacity: 20000,
-    duration: '2.5 小時',
-    exitTime: 10,
-    impactRadius: '1 km',
-    peakExitRate: 4000,
-  },
-  {
-    id: 'expo',
-    name: '大型展覽',
-    icon: '🎪',
-    venue: '南港展覽館',
-    capacity: 80000,
-    duration: '全天',
-    exitTime: 30,
-    impactRadius: '2 km',
-    peakExitRate: 6000,
-  },
+const EVENT_PRESETS = [
+  { id: 'concert', name: '演唱會', icon: '🎤', defaultVenue: '台北大巨蛋', defaultCapacity: 50000 },
+  { id: 'newyear', name: '跨年活動', icon: '🎆', defaultVenue: '台北101廣場', defaultCapacity: 300000 },
+  { id: 'baseball', name: '棒球賽', icon: '⚾', defaultVenue: '台北大巨蛋', defaultCapacity: 20000 },
+  { id: 'expo', name: '大型展覽', icon: '🎪', defaultVenue: '南港展覽館', defaultCapacity: 80000 },
+  { id: 'custom', name: '自訂情境', icon: '📝', defaultVenue: '', defaultCapacity: 0 },
 ]
 
-// 模擬散場階段
-const SIMULATION_PHASES = [
-  { time: 0, label: '散場開始', crowd: 0, roadImpact: 0 },
-  { time: 2, label: '初期湧出', crowd: 15, roadImpact: 20 },
-  { time: 4, label: '人潮高峰', crowd: 45, roadImpact: 55 },
-  { time: 6, label: '持續湧出', crowd: 70, roadImpact: 80 },
-  { time: 8, label: '高峰維持', crowd: 85, roadImpact: 92 },
-  { time: 10, label: '逐漸緩解', crowd: 92, roadImpact: 75 },
-  { time: 12, label: '回穩中', crowd: 96, roadImpact: 55 },
-  { time: 15, label: '大致疏散', crowd: 100, roadImpact: 30 },
-]
+const WEATHER_OPTIONS = ['晴天', '陰天', '小雨', '大雨', '暴風雨']
 
-const AFFECTED_ROADS = [
-  { name: '忠孝東路四段', baseLoad: 65, peakLoad: 98 },
-  { name: '光復南路', baseLoad: 55, peakLoad: 95 },
-  { name: '市民大道四段', baseLoad: 60, peakLoad: 88 },
-  { name: '忠孝東路五段', baseLoad: 50, peakLoad: 85 },
-  { name: '基隆路一段', baseLoad: 58, peakLoad: 82 },
-  { name: '松仁路', baseLoad: 40, peakLoad: 75 },
+const ANALYSIS_STEPS = [
+  { label: '查詢路網飽和度...', icon: '🛣️' },
+  { label: '分析基地台人流...', icon: '📡' },
+  { label: 'SOP 規則比對...', icon: '📋' },
+  { label: '計算 ETE + 替代路線...', icon: '🧮' },
+  { label: '產出預測報告...', icon: '📊' },
 ]
-
-function AnimatedStat({ value, suffix = '', className = '' }) {
-  const { formattedValue } = useCountUp(value, { duration: 800 })
-  return <span className={className}>{formattedValue}{suffix}</span>
-}
 
 function EventSimulator() {
-  const [selectedEvent, setSelectedEvent] = useState(null)
-  const [simRunning, setSimRunning] = useState(false)
-  const [simPhase, setSimPhase] = useState(0)
-  const [simComplete, setSimComplete] = useState(false)
-  const [elapsedMin, setElapsedMin] = useState(0)
-  const [agentResult, setAgentResult] = useState(null)
-  const [agentLoading, setAgentLoading] = useState(false)
-  const timerRef = useRef(null)
-  const phaseRef = useRef(null)
+  const [selectedPreset, setSelectedPreset] = useState(null)
+  const [venue, setVenue] = useState('')
+  const [capacity, setCapacity] = useState('')
+  const [eventTime, setEventTime] = useState('21:00')
+  const [weather, setWeather] = useState('晴天')
+  const [specialNotes, setSpecialNotes] = useState('')
+  const [analyzing, setAnalyzing] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [report, setReport] = useState(null)
+  const [toolCalls, setToolCalls] = useState([])
+  const [iterations, setIterations] = useState(0)
+  const [error, setError] = useState(null)
+  const [timelineVisible, setTimelineVisible] = useState([])
 
-  function startSimulation() {
-    if (!selectedEvent) return
-    setSimRunning(true)
-    setSimComplete(false)
-    setSimPhase(0)
-    setElapsedMin(0)
-
-    // Call AI Agent for event impact analysis
-    callEventAgent(selectedEvent)
-
-    // 每 2 秒推進一個階段（模擬加速）
-    let phase = 0
-    phaseRef.current = setInterval(() => {
-      phase++
-      if (phase >= SIMULATION_PHASES.length) {
-        clearInterval(phaseRef.current)
-        clearInterval(timerRef.current)
-        setSimRunning(false)
-        setSimComplete(true)
-        return
-      }
-      setSimPhase(phase)
-      setElapsedMin(SIMULATION_PHASES[phase].time)
-    }, 2000)
-
-    // 每秒更新分鐘計時
-    timerRef.current = setInterval(() => {
-      setElapsedMin((prev) => Math.min(prev + 0.5, 15))
-    }, 500)
+  function handlePresetSelect(preset) {
+    setSelectedPreset(preset)
+    setVenue(preset.defaultVenue)
+    setCapacity(preset.defaultCapacity > 0 ? String(preset.defaultCapacity) : '')
+    setReport(null)
+    setError(null)
+    setProgress(0)
+    setTimelineVisible([])
   }
 
-  function resetSimulation() {
-    clearInterval(phaseRef.current)
-    clearInterval(timerRef.current)
-    setSimRunning(false)
-    setSimComplete(false)
-    setSimPhase(0)
-    setElapsedMin(0)
-  }
+  async function handleAnalyze() {
+    if (!selectedPreset || !venue || !capacity) return
+    setAnalyzing(true)
+    setProgress(0)
+    setReport(null)
+    setError(null)
+    setTimelineVisible([])
 
-  async function callEventAgent(event) {
-    setAgentLoading(true)
-    setAgentResult(null)
+    const progressTimer = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 90) return prev
+        return prev + Math.random() * 12 + 3
+      })
+    }, 800)
+
     try {
       const res = await callSmartApp('event_impact', {
-        event_name: event.name,
-        venue: event.venue,
-        capacity: event.capacity,
+        event_name: selectedPreset.name,
+        venue: venue,
+        capacity: parseInt(capacity, 10),
+        event_time: eventTime,
+        weather: weather,
+        special_notes: specialNotes,
       })
-      if (res && Object.keys(res).length > 0) {
-        setAgentResult(res)
+
+      clearInterval(progressTimer)
+      setProgress(100)
+
+      if (res?.structured) {
+        setReport(res.structured)
+      } else if (res?.raw_reply) {
+        setReport({ raw: res.raw_reply })
+      } else {
+        setReport({ raw: '分析完成，但未收到結構化報告。' })
       }
+      setToolCalls(res?.tool_calls || [])
+      setIterations(res?.iterations || 0)
     } catch (err) {
-      console.error('AI Agent event_impact error:', err)
+      console.error('Analysis failed:', err)
+      clearInterval(progressTimer)
+      setError(err?.message || '分析過程發生錯誤，請稍後再試。')
+      setProgress(0)
     } finally {
-      setAgentLoading(false)
+      setAnalyzing(false)
     }
   }
 
+  // Animate timeline dots after report loads
   useEffect(() => {
-    return () => {
-      clearInterval(phaseRef.current)
-      clearInterval(timerRef.current)
+    if (report && !report.raw) {
+      const timeline = report.timeline || []
+      timeline.forEach((_, idx) => {
+        setTimeout(() => {
+          setTimelineVisible(prev => [...prev, idx])
+        }, 400 * (idx + 1))
+      })
     }
-  }, [])
+  }, [report])
 
-  const currentPhase = SIMULATION_PHASES[simPhase] || SIMULATION_PHASES[0]
+  function downloadJSON() {
+    if (!report) return
+    const data = {
+      event: {
+        type: selectedPreset?.name,
+        venue,
+        capacity: parseInt(capacity, 10),
+        time: eventTime,
+        weather,
+        specialNotes,
+      },
+      report,
+      toolCalls,
+      iterations,
+      generatedAt: new Date().toISOString(),
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `event-prediction-${Date.now()}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function downloadMarkdown() {
+    if (!report) return
+    let md = `# AI 情境預測報告\n\n`
+    md += `## 事件資訊\n`
+    md += `- **類型**: ${selectedPreset?.name}\n`
+    md += `- **地點**: ${venue}\n`
+    md += `- **人數**: ${capacity}\n`
+    md += `- **時間**: ${eventTime}\n`
+    md += `- **天氣**: ${weather}\n`
+    if (specialNotes) md += `- **備註**: ${specialNotes}\n`
+    md += `\n---\n\n`
+
+    if (report.risk_level) {
+      md += `## 風險總評\n`
+      md += `- **風險等級**: ${report.risk_level}\n`
+      md += `- **預測尖峰飽和度**: ${report.peak_saturation || 'N/A'}\n`
+      md += `- **預測 ETE**: ${report.ete || 'N/A'}\n\n`
+    }
+
+    if (report.sop_triggers?.length) {
+      md += `## SOP 觸發預測\n`
+      report.sop_triggers.forEach(t => {
+        md += `- **${t.clause || t.name}**: ${t.reason || t.action}\n`
+      })
+      md += `\n`
+    }
+
+    if (report.recommendations?.length) {
+      md += `## 建議部署方案\n`
+      report.recommendations.forEach((r, i) => {
+        md += `${i + 1}. [${r.priority || 'P1'}] ${r.action || r}\n`
+      })
+      md += `\n`
+    }
+
+    md += `\n---\n*報告產生時間: ${new Date().toLocaleString('zh-TW')}*\n`
+
+    const blob = new Blob([md], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `event-prediction-${Date.now()}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function getRiskColor(level) {
+    if (!level) return 'text-slate-400'
+    const l = level.toUpperCase()
+    if (l.includes('A') || l.includes('高') || l.includes('嚴重')) return 'text-red-400'
+    if (l.includes('B') || l.includes('中') || l.includes('警戒')) return 'text-amber-400'
+    return 'text-green-400'
+  }
+
+  function getRiskBg(level) {
+    if (!level) return 'bg-slate-700/50'
+    const l = level.toUpperCase()
+    if (l.includes('A') || l.includes('高') || l.includes('嚴重')) return 'bg-red-900/30 border-red-500/50'
+    if (l.includes('B') || l.includes('中') || l.includes('警戒')) return 'bg-amber-900/30 border-amber-500/50'
+    return 'bg-green-900/30 border-green-500/50'
+  }
+
+  const currentStep = Math.floor(progress / 20)
 
   return (
-    <div className="space-y-6">
-      {/* 活動選擇 */}
-      <div className="card-glass rounded-lg p-6">
-        <h2 className="text-xl font-bold text-white mb-2">🏟️ 大型活動模擬器</h2>
-        <p className="text-sm text-slate-400 mb-5">模擬大型活動散場的交通衝擊，產出事前部署建議</p>
-
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          {EVENTS.map((event) => (
-            <button
-              key={event.id}
-              onClick={() => { setSelectedEvent(event); resetSimulation() }}
-              disabled={simRunning}
-              className={`p-4 rounded-xl border text-center transition-all ${
-                selectedEvent?.id === event.id
-                  ? 'border-blue-500 bg-blue-500/15 ring-2 ring-blue-500/30 scale-105'
-                  : 'border-slate-600 bg-slate-700/50 hover:border-slate-500 hover:scale-102'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              <span className="text-3xl block mb-2">{event.icon}</span>
-              <span className="text-sm font-medium text-white block">{event.name}</span>
-              <span className="text-xs text-slate-400 block mt-1">
-                {event.capacity.toLocaleString()} 人
-              </span>
-            </button>
-          ))}
+    <div className="space-y-8">
+      {/* Section 1: Input Form */}
+      <div className="card-glass rounded-2xl p-8 border border-slate-700/50">
+        <div className="text-center mb-8">
+          <h2 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent mb-3">
+            🔮 AI 情境預測規劃器
+          </h2>
+          <p className="text-lg text-slate-400">
+            輸入事件參數，AI Agent 將根據 SOP 規則預測路網衝擊並產出應對計畫
+          </p>
         </div>
 
-        {/* 選定活動詳情 */}
-        {selectedEvent && (
-          <div className="bg-slate-900 border border-slate-700 rounded-xl p-4 mb-5">
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 text-center">
+        {/* Preset Selection Grid */}
+        <div className="mb-6">
+          <label className="block text-base font-semibold text-slate-300 mb-3">選擇事件類型</label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+            {EVENT_PRESETS.map(preset => (
+              <button
+                key={preset.id}
+                onClick={() => handlePresetSelect(preset)}
+                className={`p-4 rounded-xl border-2 transition-all duration-300 text-center hover:scale-105 ${
+                  selectedPreset?.id === preset.id
+                    ? 'border-cyan-400 bg-cyan-900/30 shadow-lg shadow-cyan-500/20'
+                    : 'border-slate-600 bg-slate-800/50 hover:border-slate-500'
+                }`}
+              >
+                <span className="text-3xl block mb-2">{preset.icon}</span>
+                <span className="text-sm font-medium text-slate-200">{preset.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Detail Form (shown when preset selected) */}
+        {selectedPreset && (
+          <div className="space-y-4 mt-6 p-6 rounded-xl bg-slate-800/50 border border-slate-700/50">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <p className="text-xs text-slate-400">場館</p>
-                <p className="text-sm text-white font-medium">{selectedEvent.venue}</p>
+                <label className="block text-sm font-medium text-slate-300 mb-1">活動地點</label>
+                <input
+                  type="text"
+                  value={venue}
+                  onChange={e => setVenue(e.target.value)}
+                  placeholder="輸入活動地點"
+                  className="w-full px-4 py-3 rounded-lg bg-slate-900/80 border border-slate-600 text-slate-100 text-base placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-colors"
+                />
               </div>
               <div>
-                <p className="text-xs text-slate-400">容量</p>
-                <p className="text-sm text-white font-medium">{selectedEvent.capacity.toLocaleString()} 人</p>
+                <label className="block text-sm font-medium text-slate-300 mb-1">預估人數</label>
+                <input
+                  type="number"
+                  value={capacity}
+                  onChange={e => setCapacity(e.target.value)}
+                  placeholder="例: 50000"
+                  className="w-full px-4 py-3 rounded-lg bg-slate-900/80 border border-slate-600 text-slate-100 text-base placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-colors"
+                />
               </div>
               <div>
-                <p className="text-xs text-slate-400">散場時間</p>
-                <p className="text-sm text-white font-medium">{selectedEvent.exitTime} 分鐘</p>
+                <label className="block text-sm font-medium text-slate-300 mb-1">散場時間</label>
+                <input
+                  type="time"
+                  value={eventTime}
+                  onChange={e => setEventTime(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg bg-slate-900/80 border border-slate-600 text-slate-100 text-base focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-colors"
+                />
               </div>
               <div>
-                <p className="text-xs text-slate-400">尖峰流出</p>
-                <p className="text-sm text-amber-400 font-medium">{selectedEvent.peakExitRate.toLocaleString()} 人/分</p>
+                <label className="block text-sm font-medium text-slate-300 mb-1">天氣狀況</label>
+                <select
+                  value={weather}
+                  onChange={e => setWeather(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg bg-slate-900/80 border border-slate-600 text-slate-100 text-base focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-colors"
+                >
+                  {WEATHER_OPTIONS.map(w => (
+                    <option key={w} value={w}>{w}</option>
+                  ))}
+                </select>
               </div>
-              <div>
-                <p className="text-xs text-slate-400">影響範圍</p>
-                <p className="text-sm text-red-400 font-medium">{selectedEvent.impactRadius}</p>
-              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">特殊備註（選填）</label>
+              <textarea
+                value={specialNotes}
+                onChange={e => setSpecialNotes(e.target.value)}
+                placeholder="例: VIP 通道需求、周邊道路施工..."
+                rows={2}
+                className="w-full px-4 py-3 rounded-lg bg-slate-900/80 border border-slate-600 text-slate-100 text-base placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-colors resize-none"
+              />
             </div>
           </div>
         )}
 
-        {/* 控制按鈕 */}
-        <div className="flex gap-3">
+        {/* Analyze Button */}
+        <div className="mt-6 text-center">
           <button
-            onClick={startSimulation}
-            disabled={!selectedEvent || simRunning}
-            className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed text-white font-bold rounded-lg shadow-lg shadow-blue-500/20 transition-all"
+            onClick={handleAnalyze}
+            disabled={!selectedPreset || !venue || !capacity || analyzing}
+            className="px-8 py-4 rounded-xl text-lg font-bold transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-105 active:scale-95"
           >
-            {simRunning ? '⏳ 模擬進行中...' : simComplete ? '🔄 重新模擬' : '▶ 開始模擬散場'}
+            {analyzing ? (
+              <span className="flex items-center gap-2 justify-center">
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                AI 分析中...
+              </span>
+            ) : (
+              '🤖 開始 AI 分析'
+            )}
           </button>
-          {simRunning && (
-            <button
-              onClick={resetSimulation}
-              className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-all"
-            >
-              ⏹ 停止
-            </button>
-          )}
         </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="mt-4 p-4 rounded-lg bg-red-900/30 border border-red-500/50 text-red-300 text-center">
+            ⚠️ {error}
+          </div>
+        )}
       </div>
 
-      {/* 模擬動畫區 */}
-      {(simRunning || simComplete) && (
-        <div className="card-glass rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white">📊 散場模擬</h3>
-            <div className="flex items-center gap-2">
-              {simRunning && <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></span>}
-              <span className="text-sm font-mono text-blue-400">T+{Math.floor(elapsedMin)} min</span>
-              {simComplete && <span className="text-xs text-green-400 ml-2">✅ 模擬完成</span>}
-            </div>
+      {/* Section 2: Analysis Progress */}
+      {(analyzing || progress > 0) && (
+        <div className="card-glass rounded-2xl p-8 border border-slate-700/50">
+          <h3 className="text-xl font-bold text-slate-200 mb-4">
+            {progress >= 100 ? '✅ 分析完成' : '⏳ AI Agent 分析進行中...'}
+          </h3>
+
+          {/* Progress Bar */}
+          <div className="w-full h-4 bg-slate-800 rounded-full overflow-hidden mb-6 border border-slate-700">
+            <div
+              className="h-full rounded-full transition-all duration-700 ease-out"
+              style={{
+                width: `${Math.min(progress, 100)}%`,
+                background: progress >= 100
+                  ? 'linear-gradient(90deg, #10b981, #34d399)'
+                  : 'linear-gradient(90deg, #06b6d4, #3b82f6, #8b5cf6)',
+              }}
+            />
           </div>
 
-          {/* 階段進度 */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-              <span>散場開始</span>
-              <span className="text-white font-medium">{currentPhase.label}</span>
-              <span>疏散完成</span>
-            </div>
-            <div className="w-full h-3 bg-slate-700 rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-1000 ease-out bg-gradient-to-r from-blue-500 via-amber-500 to-green-500"
-                style={{ width: `${(simPhase / (SIMULATION_PHASES.length - 1)) * 100}%` }}
-              ></div>
-            </div>
-          </div>
-
-          {/* 即時指標 */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="bg-slate-700/50 rounded-lg p-3 text-center">
-              <p className="text-xs text-slate-400">已疏散人數</p>
-              <AnimatedStat
-                value={Math.floor(selectedEvent.capacity * currentPhase.crowd / 100)}
-                className="text-xl font-bold text-cyan-400"
-              />
-              <p className="text-xs text-slate-500 mt-0.5">
-                /{selectedEvent.capacity.toLocaleString()}
-              </p>
-            </div>
-            <div className="bg-slate-700/50 rounded-lg p-3 text-center">
-              <p className="text-xs text-slate-400">疏散進度</p>
-              <AnimatedStat value={currentPhase.crowd} suffix="%" className="text-xl font-bold text-white" />
-            </div>
-            <div className={`bg-slate-700/50 rounded-lg p-3 text-center ${currentPhase.roadImpact > 80 ? 'glow-red' : currentPhase.roadImpact > 50 ? 'glow-amber' : ''}`}>
-              <p className="text-xs text-slate-400">路網衝擊度</p>
-              <AnimatedStat
-                value={currentPhase.roadImpact}
-                suffix="%"
-                className={`text-xl font-bold ${
-                  currentPhase.roadImpact > 80 ? 'text-red-400' :
-                  currentPhase.roadImpact > 50 ? 'text-amber-400' : 'text-green-400'
-                }`}
-              />
-            </div>
-            <div className="bg-slate-700/50 rounded-lg p-3 text-center">
-              <p className="text-xs text-slate-400">即時流出率</p>
-              <AnimatedStat
-                value={Math.floor(selectedEvent.peakExitRate * currentPhase.crowd / 100 * (currentPhase.roadImpact / 80))}
-                suffix=" 人/分"
-                className="text-xl font-bold text-amber-400"
-              />
-            </div>
-          </div>
-
-          {/* 路段衝擊動態 */}
-          <h4 className="text-sm font-medium text-slate-300 mb-3">🚦 周邊路段即時負載</h4>
-          <div className="space-y-2">
-            {AFFECTED_ROADS.map((road) => {
-              const currentLoad = Math.floor(
-                road.baseLoad + (road.peakLoad - road.baseLoad) * (currentPhase.roadImpact / 100)
-              )
-              const isOverloaded = currentLoad > 90
-              const isWarning = currentLoad > 80
+          {/* Step Indicators */}
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+            {ANALYSIS_STEPS.map((step, idx) => {
+              const isActive = currentStep >= idx
+              const isCurrent = currentStep === idx && progress < 100
               return (
-                <div key={road.name} className="flex items-center gap-3">
-                  <span className="text-xs text-slate-300 w-28 truncate">{road.name}</span>
-                  <div className="flex-1 h-3 bg-slate-700 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-1000 ease-out ${
-                        isOverloaded ? 'bg-red-500' : isWarning ? 'bg-amber-500' : 'bg-green-500'
-                      }`}
-                      style={{ width: `${currentLoad}%` }}
-                    ></div>
-                  </div>
-                  <span className={`text-xs font-mono w-10 text-right ${
-                    isOverloaded ? 'text-red-400 animate-pulse' : isWarning ? 'text-amber-400' : 'text-green-400'
-                  }`}>
-                    {currentLoad}%
+                <div
+                  key={idx}
+                  className={`flex items-center gap-2 p-3 rounded-lg transition-all duration-500 ${
+                    isActive
+                      ? progress >= 100
+                        ? 'bg-green-900/30 border border-green-500/50'
+                        : isCurrent
+                        ? 'bg-cyan-900/30 border border-cyan-500/50 animate-pulse'
+                        : 'bg-slate-700/50 border border-slate-600'
+                      : 'bg-slate-800/30 border border-slate-700/30 opacity-40'
+                  }`}
+                >
+                  <span className="text-lg">{isActive && progress >= 100 ? '✅' : step.icon}</span>
+                  <span className={`text-xs font-medium ${isActive ? 'text-slate-200' : 'text-slate-500'}`}>
+                    {step.label}
                   </span>
                 </div>
               )
             })}
           </div>
-
-          {/* 時間軸小點 */}
-          <div className="mt-6 flex items-center justify-between">
-            {SIMULATION_PHASES.map((phase, i) => (
-              <div key={i} className="flex flex-col items-center">
-                <div className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                  i <= simPhase ? 'bg-blue-500 scale-110' : 'bg-slate-600'
-                } ${i === simPhase && simRunning ? 'animate-pulse ring-2 ring-blue-500/50' : ''}`}></div>
-                <span className="text-xs text-slate-500 mt-1">{phase.time}m</span>
-              </div>
-            ))}
-          </div>
         </div>
       )}
 
-      {/* 事前部署建議 */}
-      {simComplete && selectedEvent && (
-        <>
-          {/* AI Agent 分析 */}
-          {agentLoading && (
-            <div className="card-glass rounded-lg p-4 flex items-center gap-3">
-              <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-cyan-500"></div>
-              <span className="text-sm text-cyan-400">AI Agent 事件衝擊分析中...</span>
+      {/* Section 3: Report Display */}
+      {report && (
+        <div className="space-y-6">
+          {/* Raw report fallback */}
+          {report.raw && (
+            <div className="card-glass rounded-2xl p-8 border border-slate-700/50">
+              <h3 className="text-xl font-bold text-slate-200 mb-4">📊 分析結果</h3>
+              <div className="whitespace-pre-wrap text-base text-slate-300 leading-relaxed">
+                {report.raw}
+              </div>
             </div>
           )}
-          {agentResult && (
-            <div className="card-glass rounded-lg p-4 border border-cyan-500/20">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-sm">🤖</span>
-                <span className="text-sm text-cyan-400 font-medium">AI Agent 分析</span>
-                {agentResult.iterations && <span className="text-xs text-slate-500">{agentResult.iterations} 輪推理</span>}
+
+          {/* Card 1: Risk Summary */}
+          {!report.raw && (
+            <>
+              <div className={`rounded-2xl p-8 border ${getRiskBg(report.risk_level)}`}>
+                <h3 className="text-xl font-bold text-slate-200 mb-4">🚨 風險總評</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="text-center">
+                    <div className={`text-5xl font-black ${getRiskColor(report.risk_level)}`}>
+                      {report.risk_level || 'N/A'}
+                    </div>
+                    <div className="text-sm text-slate-400 mt-2">風險等級</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-4xl font-bold text-cyan-400">
+                      {report.peak_saturation || 'N/A'}
+                    </div>
+                    <div className="text-sm text-slate-400 mt-2">預測尖峰飽和度</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-4xl font-bold text-amber-400">
+                      {report.ete || 'N/A'}
+                    </div>
+                    <div className="text-sm text-slate-400 mt-2">預估疏散時間 (ETE)</div>
+                  </div>
+                </div>
+                {report.affected_roads && (
+                  <div className="mt-4 pt-4 border-t border-slate-700/50 text-center">
+                    <span className="text-slate-400">影響路段: </span>
+                    <span className="text-slate-200 font-medium">
+                      {Array.isArray(report.affected_roads) ? report.affected_roads.join('、') : report.affected_roads}
+                    </span>
+                  </div>
+                )}
               </div>
-              {agentResult.impact_analysis && (
-                <div className="space-y-2">
-                  {typeof agentResult.impact_analysis === 'string' ? (
-                    <p className="text-xs text-slate-300">{agentResult.impact_analysis}</p>
-                  ) : (
-                    Object.entries(agentResult.impact_analysis).map(([key, val], i) => (
-                      <div key={i} className="bg-slate-700/30 rounded p-2 text-xs text-slate-300">
-                        <span className="text-white font-medium">{key}：</span>
-                        <span>{typeof val === 'object' ? JSON.stringify(val) : val}</span>
+
+              {/* Card 2: Timeline Prediction */}
+              {report.timeline && report.timeline.length > 0 && (
+                <div className="card-glass rounded-2xl p-8 border border-slate-700/50">
+                  <h3 className="text-xl font-bold text-slate-200 mb-6">📈 時間軸預測</h3>
+                  <div className="relative">
+                    {/* Timeline Line */}
+                    <div className="absolute top-6 left-0 right-0 h-1 bg-slate-700 rounded-full" />
+                    <div className="flex justify-between relative">
+                      {report.timeline.map((point, idx) => {
+                        const isVisible = timelineVisible.includes(idx)
+                        return (
+                          <div
+                            key={idx}
+                            className={`flex flex-col items-center transition-all duration-700 ${
+                              isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                            }`}
+                          >
+                            <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-500 ${
+                              isVisible
+                                ? point.saturation > 80
+                                  ? 'bg-red-400 border-red-300 shadow-lg shadow-red-500/50'
+                                  : point.saturation > 50
+                                  ? 'bg-amber-400 border-amber-300 shadow-lg shadow-amber-500/50'
+                                  : 'bg-green-400 border-green-300 shadow-lg shadow-green-500/50'
+                                : 'bg-slate-600 border-slate-500'
+                            }`} />
+                            <div className="mt-3 text-center">
+                              <div className="text-xs font-medium text-slate-400">{point.time || point.label}</div>
+                              <div className={`text-lg font-bold mt-1 ${
+                                point.saturation > 80 ? 'text-red-400'
+                                : point.saturation > 50 ? 'text-amber-400'
+                                : 'text-green-400'
+                              }`}>
+                                {point.saturation != null ? `${point.saturation}%` : point.value || ''}
+                              </div>
+                              {point.crowd && (
+                                <div className="text-xs text-slate-500 mt-1">{point.crowd}</div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Card 3: SOP Triggers */}
+              {report.sop_triggers && report.sop_triggers.length > 0 && (
+                <div className="card-glass rounded-2xl p-8 border border-slate-700/50">
+                  <h3 className="text-xl font-bold text-slate-200 mb-4">📋 SOP 觸發預測</h3>
+                  <div className="space-y-3">
+                    {report.sop_triggers.map((trigger, idx) => (
+                      <div
+                        key={idx}
+                        className="p-4 rounded-xl bg-slate-800/60 border border-slate-700/50 hover:border-amber-500/30 transition-colors"
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="text-amber-400 font-bold text-sm whitespace-nowrap mt-0.5">
+                            {trigger.clause || `SOP-${idx + 1}`}
+                          </span>
+                          <div className="flex-1">
+                            <div className="text-slate-200 text-base font-medium">
+                              {trigger.reason || trigger.description || trigger.name}
+                            </div>
+                            {trigger.action && (
+                              <div className="text-sm text-cyan-400 mt-1">
+                                → 建議動作: {trigger.action}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    ))
-                  )}
+                    ))}
+                  </div>
                 </div>
               )}
-              {agentResult.recommendations && (
-                <div className="mt-2 space-y-1">
-                  {agentResult.recommendations.map((rec, i) => (
-                    <p key={i} className="text-xs text-green-400">💡 {rec}</p>
-                  ))}
+
+              {/* Card 4: Deployment Recommendations */}
+              {report.recommendations && report.recommendations.length > 0 && (
+                <div className="card-glass rounded-2xl p-8 border border-slate-700/50">
+                  <h3 className="text-xl font-bold text-slate-200 mb-4">🎯 建議部署方案</h3>
+                  <div className="space-y-3">
+                    {report.recommendations.map((rec, idx) => {
+                      const priority = rec.priority || 'P1'
+                      const priorityColor = priority === 'P0' ? 'text-red-400 bg-red-900/30 border-red-500/50'
+                        : priority === 'P1' ? 'text-amber-400 bg-amber-900/30 border-amber-500/50'
+                        : 'text-green-400 bg-green-900/30 border-green-500/50'
+                      return (
+                        <div
+                          key={idx}
+                          className="flex items-start gap-3 p-4 rounded-xl bg-slate-800/60 border border-slate-700/50"
+                        >
+                          <span className={`px-2 py-0.5 rounded text-xs font-bold border ${priorityColor}`}>
+                            {priority}
+                          </span>
+                          <div className="flex-1">
+                            <span className="text-slate-200 text-base">
+                              {typeof rec === 'string' ? rec : rec.action || rec.description}
+                            </span>
+                          </div>
+                          <span className="text-slate-500 text-sm">#{idx + 1}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
-              {agentResult.summary && (
-                <p className="text-xs text-slate-300 mt-2">{agentResult.summary}</p>
-              )}
-              {agentResult.tool_calls?.length > 0 && (
-                <div className="mt-3 pt-2 border-t border-slate-700">
-                  <p className="text-xs text-slate-500 mb-1">推理過程：</p>
-                  {agentResult.tool_calls.map((tc, i) => (
-                    <div key={i} className="text-xs text-slate-400">→ <span className="text-cyan-300">{tc.tool}</span></div>
-                  ))}
+
+              {/* Card 5: Agent Reasoning Process */}
+              <div className="card-glass rounded-2xl p-8 border border-slate-700/50">
+                <h3 className="text-xl font-bold text-slate-200 mb-4">🧠 Agent 推理過程</h3>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700/50 text-center">
+                    <div className="text-3xl font-bold text-cyan-400">{iterations}</div>
+                    <div className="text-sm text-slate-400 mt-1">推理迭代次數</div>
+                  </div>
+                  <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700/50 text-center">
+                    <div className="text-3xl font-bold text-purple-400">{toolCalls.length}</div>
+                    <div className="text-sm text-slate-400 mt-1">工具呼叫次數</div>
+                  </div>
                 </div>
-              )}
-            </div>
-          )}
-          <DeploymentPlan event={selectedEvent} />
-          <DeploymentGantt event={selectedEvent} />
-        </>
-      )}
-    </div>
-  )
-}
-
-// 事前部署建議子元件
-function DeploymentPlan({ event }) {
-  const plans = getDeploymentPlan(event)
-
-  function handleExport() {
-    const md = generateDeploymentMarkdown(event, plans)
-    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `事前部署計畫書_${event.name}_${event.venue}.md`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  return (
-    <div className="card-glass rounded-lg p-6 border-gradient">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-bold text-white">📋 事前部署計畫書</h3>
-        <div className="flex gap-2">
-          <button
-            onClick={handleExport}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg transition-colors"
-          >
-            📥 匯出 Markdown
-          </button>
-          <button
-            onClick={() => window.print()}
-            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded-lg transition-colors"
-          >
-            🖨️ 列印
-          </button>
-          <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded-lg text-xs">
-            AI 自動產出
-          </span>
-        </div>
-      </div>
-
-      {/* 活動摘要 */}
-      <div className="bg-slate-900 border border-slate-700 rounded-xl p-4 mb-5">
-        <h4 className="text-sm font-medium text-blue-400 mb-2">活動基本資訊</h4>
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
-          <div><span className="text-slate-400">活動：</span><span className="text-white">{event.icon} {event.name}</span></div>
-          <div><span className="text-slate-400">場館：</span><span className="text-white">{event.venue}</span></div>
-          <div><span className="text-slate-400">人數：</span><span className="text-white">{event.capacity.toLocaleString()}</span></div>
-          <div><span className="text-slate-400">散場時間：</span><span className="text-white">{event.exitTime} 分鐘</span></div>
-          <div><span className="text-slate-400">影響範圍：</span><span className="text-white">{event.impactRadius}</span></div>
-        </div>
-      </div>
-
-      <p className="text-sm text-slate-400 mb-5">
-        以下建議應於活動散場前 <strong className="text-amber-400">30 分鐘</strong> 完成部署，各單位請依時間表執行
-      </p>
-
-      <div className="space-y-4">
-        {plans.map((plan, i) => (
-          <div key={i} className="bg-slate-700/30 border border-slate-700 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <span className="text-xl flex-shrink-0">{plan.icon}</span>
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-1">
-                  <h4 className="text-sm font-medium text-white">{plan.title}</h4>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${
-                    plan.priority === 'high' ? 'bg-red-500/20 text-red-400' :
-                    plan.priority === 'medium' ? 'bg-amber-500/20 text-amber-400' :
-                    'bg-blue-500/20 text-blue-400'
-                  }`}>
-                    {plan.priority === 'high' ? '優先' : plan.priority === 'medium' ? '建議' : '備選'}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-300 leading-relaxed">{plan.description}</p>
-                {plan.details && (
-                  <div className="mt-2 bg-slate-800 rounded p-2">
-                    {plan.details.map((d, j) => (
-                      <p key={j} className="text-xs text-slate-400">• {d}</p>
+                {toolCalls.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-slate-400 mb-2">工具呼叫記錄:</div>
+                    {toolCalls.map((tc, idx) => (
+                      <div key={idx} className="p-3 rounded-lg bg-slate-900/60 border border-slate-700/30 text-sm">
+                        <span className="text-cyan-400 font-mono">{tc.tool || tc.name || `Tool ${idx + 1}`}</span>
+                        {tc.input && (
+                          <span className="text-slate-500 ml-2">
+                            ({typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input).slice(0, 80)}...)
+                          </span>
+                        )}
+                      </div>
                     ))}
                   </div>
                 )}
-                <div className="flex gap-3 mt-2">
-                  <span className="text-xs text-slate-500">⏰ 執行時機：{plan.timing}</span>
-                  <span className="text-xs text-slate-500">👤 負責：{plan.responsible}</span>
-                </div>
               </div>
+            </>
+          )}
+
+          {/* Section 4: Download Buttons */}
+          <div className="card-glass rounded-2xl p-6 border border-slate-700/50">
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <button
+                onClick={downloadJSON}
+                className="px-6 py-3 rounded-xl bg-slate-700/60 border border-slate-600 text-slate-200 font-medium hover:bg-slate-600/60 hover:border-cyan-500/50 transition-all duration-300 hover:scale-105"
+              >
+                📥 下載 JSON 報告
+              </button>
+              <button
+                onClick={downloadMarkdown}
+                className="px-6 py-3 rounded-xl bg-slate-700/60 border border-slate-600 text-slate-200 font-medium hover:bg-slate-600/60 hover:border-purple-500/50 transition-all duration-300 hover:scale-105"
+              >
+                📄 下載 Markdown 報告
+              </button>
             </div>
           </div>
-        ))}
-      </div>
-
-      {/* 摘要統計 */}
-      <div className="mt-6 grid grid-cols-4 gap-3">
-        <div className="bg-slate-700/50 rounded-lg p-3 text-center">
-          <p className="text-lg font-bold text-white">{plans.length}</p>
-          <p className="text-xs text-slate-400">部署項目</p>
         </div>
-        <div className="bg-slate-700/50 rounded-lg p-3 text-center">
-          <p className="text-lg font-bold text-amber-400">30 分鐘</p>
-          <p className="text-xs text-slate-400">最早啟動</p>
-        </div>
-        <div className="bg-slate-700/50 rounded-lg p-3 text-center">
-          <p className="text-lg font-bold text-green-400">4 單位</p>
-          <p className="text-xs text-slate-400">跨系統聯動</p>
-        </div>
-        <div className="bg-slate-700/50 rounded-lg p-3 text-center">
-          <p className="text-lg font-bold text-cyan-400">{Math.ceil(event.capacity * 0.15 / 45)}</p>
-          <p className="text-xs text-slate-400">接駁車次</p>
-        </div>
-      </div>
+      )}
     </div>
   )
-}
-
-function getDeploymentPlan(event) {
-  const base = [
-    {
-      icon: '🚦',
-      title: '號誌預調整',
-      description: `散場前 20 分鐘，將場館周邊 6 個路口切換為「疏散模式」：出場方向綠燈時間 +40%，進場方向紅燈延長。`,
-      details: [
-        '光復南路/忠孝東路口：南向綠燈 40s → 56s',
-        '市民大道/光復南路口：東向綠燈 35s → 49s',
-        '忠孝東路/基隆路口：東向綠燈 +30%',
-      ],
-      timing: '散場前 20 分鐘',
-      responsible: '交控中心',
-      priority: 'high',
-    },
-    {
-      icon: '🚇',
-      title: '捷運加開列車',
-      description: `通知台北捷運於散場時段加開板南線、文湖線班次，忠孝復興站增派站務人員。`,
-      details: [
-        '板南線：散場後 30 分鐘內加開 6 班次',
-        '國父紀念館站：開放全部閘門出站',
-        '忠孝復興站：增派 4 名站務人員引導',
-      ],
-      timing: '散場前 30 分鐘通知',
-      responsible: '台北捷運公司',
-      priority: 'high',
-    },
-    {
-      icon: '🚌',
-      title: '接駁公車調度',
-      description: `於場館南側設置臨時接駁站，發車至市府轉運站、忠孝復興站、台北車站。`,
-      details: [
-        `預估需求：${Math.ceil(event.capacity * 0.15 / 45)} 車次（45 人/車）`,
-        '路線 A：大巨蛋 → 市府轉運站（5 分鐘一班）',
-        '路線 B：大巨蛋 → 忠孝復興站（5 分鐘一班）',
-      ],
-      timing: '散場前 10 分鐘就位',
-      responsible: '公車處',
-      priority: 'high',
-    },
-    {
-      icon: '👮',
-      title: '警力部署',
-      description: `場館四周主要路口派駐交通警察手動指揮，優先確保行人安全通過。`,
-      details: [
-        '光復南路/忠孝路口：2 名警力',
-        '國父紀念館前：2 名警力 + 人行管制',
-        '光復南路/市民大道口：2 名警力',
-      ],
-      timing: '散場前 15 分鐘到位',
-      responsible: '交通大隊',
-      priority: 'medium',
-    },
-    {
-      icon: '📡',
-      title: '多語通報預備',
-      description: `若漫遊率預期 ≥ 30%，提前生成多語疏散指引，散場時立即推送。`,
-      details: [
-        '中/英/日/韓四語版本預先生成',
-        'CBS 細胞廣播範圍設定：場館 1.5km 內',
-        '電子看板切換為疏散模式顯示',
-      ],
-      timing: '散場前 10 分鐘準備',
-      responsible: '通報系統',
-      priority: 'medium',
-    },
-    {
-      icon: '🗺️',
-      title: '導航平台通報',
-      description: `推送活動散場資訊至 Google Maps / Apple Maps，引導車輛避開場館周邊。`,
-      details: [
-        '推送範圍：場館周邊 2km',
-        '建議繞行路線：仁愛路 / 信義路',
-        '預估影響時間：散場後 30 分鐘',
-      ],
-      timing: '散場前 20 分鐘推送',
-      responsible: '交通局',
-      priority: 'low',
-    },
-  ]
-
-  // 根據活動規模調整
-  if (event.capacity >= 100000) {
-    base.push({
-      icon: '🚁',
-      title: '空中監控啟動',
-      description: '啟動無人機即時監控人流動態，回傳畫面至交控中心輔助決策。',
-      details: ['部署 2 架監控無人機', '覆蓋範圍：場館周邊 3km', '即時回傳 4K 影像'],
-      timing: '散場前 15 分鐘起飛',
-      responsible: '警政署',
-      priority: 'medium',
-    })
-  }
-
-  return base
-}
-
-// 時間軸甘特圖
-function DeploymentGantt({ event }) {
-  const timeline = [
-    { time: -30, label: 'T-30', items: [{ name: '通知捷運加開', unit: '台北捷運', color: 'blue' }] },
-    { time: -20, label: 'T-20', items: [{ name: '號誌切換疏散模式', unit: '交控中心', color: 'green' }, { name: '導航平台推送', unit: '交通局', color: 'cyan' }] },
-    { time: -15, label: 'T-15', items: [{ name: '警力到位', unit: '交通大隊', color: 'purple' }, { name: event.capacity >= 100000 ? '無人機起飛' : 'YouBike 調度', unit: event.capacity >= 100000 ? '警政署' : '運具系統', color: 'amber' }] },
-    { time: -10, label: 'T-10', items: [{ name: '接駁車就位', unit: '公車處', color: 'green' }, { name: '多語通報預生成', unit: '通報系統', color: 'amber' }] },
-    { time: 0, label: '散場', items: [{ name: 'CBS 推播發送', unit: '通報系統', color: 'red' }, { name: '接駁車開始發車', unit: '公車處', color: 'green' }] },
-    { time: 5, label: 'T+5', items: [{ name: '人潮高峰處理', unit: '現場', color: 'red' }] },
-    { time: 15, label: 'T+15', items: [{ name: '號誌逐步恢復', unit: '交控中心', color: 'green' }] },
-    { time: 30, label: 'T+30', items: [{ name: '接駁車收班', unit: '公車處', color: 'slate' }, { name: '警力撤離', unit: '交通大隊', color: 'slate' }] },
-  ]
-
-  const COLOR_MAP = {
-    red: 'bg-red-500/20 border-red-500/40 text-red-400',
-    blue: 'bg-blue-500/20 border-blue-500/40 text-blue-400',
-    green: 'bg-green-500/20 border-green-500/40 text-green-400',
-    amber: 'bg-amber-500/20 border-amber-500/40 text-amber-400',
-    purple: 'bg-purple-500/20 border-purple-500/40 text-purple-400',
-    cyan: 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400',
-    slate: 'bg-slate-500/20 border-slate-500/40 text-slate-400',
-  }
-
-  return (
-    <div className="card-glass rounded-lg p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-bold text-white">⏰ 部署時間軸（甘特圖）</h3>
-        <span className="text-xs text-slate-400">以散場時間為基準（T=0）</span>
-      </div>
-
-      <div className="relative">
-        {/* 時間軸線 */}
-        <div className="absolute left-16 top-0 bottom-0 w-0.5 bg-slate-700"></div>
-        {/* 散場標記線 */}
-        <div className="absolute left-16 top-0 bottom-0 w-0.5" style={{ top: '50%' }}></div>
-
-        <div className="space-y-1">
-          {timeline.map((slot, i) => (
-            <div key={i} className="flex items-start gap-4">
-              {/* 時間標籤 */}
-              <div className={`w-14 text-right flex-shrink-0 pt-2 ${
-                slot.time === 0 ? 'text-red-400 font-bold' : slot.time < 0 ? 'text-blue-400' : 'text-green-400'
-              }`}>
-                <span className="text-xs font-mono">
-                  {slot.time === 0 ? '🔔' : slot.time > 0 ? `+${slot.time}m` : `${slot.time}m`}
-                </span>
-              </div>
-
-              {/* 節點 */}
-              <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-2 z-10 ${
-                slot.time === 0 ? 'bg-red-500 border-red-400' :
-                slot.time < 0 ? 'bg-blue-500 border-blue-400' : 'bg-green-500 border-green-400'
-              }`}></div>
-
-              {/* 項目 */}
-              <div className="flex-1 pb-3">
-                <p className="text-xs text-slate-500 mb-1">
-                  {slot.time === 0 ? '── 散場開始 ──' : slot.label}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {slot.items.map((item, j) => (
-                    <div key={j} className={`px-3 py-1.5 rounded-lg border text-xs ${COLOR_MAP[item.color]}`}>
-                      <span className="font-medium">{item.name}</span>
-                      <span className="text-slate-500 ml-2">({item.unit})</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 圖例 */}
-      <div className="mt-4 pt-3 border-t border-slate-700 flex flex-wrap gap-3 text-xs text-slate-400">
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500"></span> 事前準備</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500"></span> 散場啟動</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500"></span> 事後恢復</span>
-      </div>
-    </div>
-  )
-}
-
-// Markdown 匯出
-function generateDeploymentMarkdown(event, plans) {
-  return `# 事前部署計畫書
-
-## 活動資訊
-
-| 項目 | 內容 |
-|------|------|
-| 活動名稱 | ${event.icon} ${event.name} |
-| 場館 | ${event.venue} |
-| 預估人數 | ${event.capacity.toLocaleString()} 人 |
-| 散場預估時間 | ${event.exitTime} 分鐘 |
-| 尖峰流出率 | ${event.peakExitRate.toLocaleString()} 人/分鐘 |
-| 影響範圍 | ${event.impactRadius} |
-
-## 部署時間表
-
-| 時間 | 項目 | 負責單位 | 優先度 |
-|------|------|---------|--------|
-| T-30 分鐘 | 通知捷運加開 | 台北捷運 | 高 |
-| T-20 分鐘 | 號誌切換疏散模式 | 交控中心 | 高 |
-| T-20 分鐘 | 導航平台推送避開 | 交通局 | 低 |
-| T-15 分鐘 | 警力到位 | 交通大隊 | 中 |
-| T-10 分鐘 | 接駁車就位 | 公車處 | 高 |
-| T-10 分鐘 | 多語通報預生成 | 通報系統 | 中 |
-| T=0 散場 | CBS 推播發送 | 通報系統 | 高 |
-| T=0 散場 | 接駁車開始發車 | 公車處 | 高 |
-| T+15 分鐘 | 號誌逐步恢復 | 交控中心 | - |
-| T+30 分鐘 | 接駁收班、警力撤離 | 各單位 | - |
-
-## 詳細部署項目
-
-${plans.map((p, i) => `### ${i + 1}. ${p.icon} ${p.title}（${p.priority === 'high' ? '優先' : p.priority === 'medium' ? '建議' : '備選'}）
-
-${p.description}
-
-${p.details ? p.details.map((d) => `- ${d}`).join('\n') : ''}
-
-- **執行時機**：${p.timing}
-- **負責單位**：${p.responsible}
-`).join('\n')}
-
-## 預估資源需求
-
-| 資源 | 數量 | 說明 |
-|------|------|------|
-| 接駁車 | ${Math.ceil(event.capacity * 0.15 / 45)} 車次 | 5 分鐘一班 |
-| 警力 | 6 名 | 3 個主要路口 |
-| 捷運加開 | 6 班次 | 散場後 30 分鐘內 |
-| 電子看板 | 12 面 | 切換疏散模式 |
-
----
-*本計畫書由城市應變分析 AI Agent 自動產出*
-*產出時間：${new Date().toLocaleString('zh-TW')}*
-`
 }
 
 export default EventSimulator
