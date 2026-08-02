@@ -488,7 +488,8 @@ function App() {
             {incidentResult && (
               <div className="card-glass rounded-lg p-6">
                 <h2 className="text-lg font-semibold text-white mb-3">📡 發送對象篩選（地理圍欄）</h2>
-                <p className="text-sm text-slate-400 mb-4">系統根據事件位置自動識別影響範圍內的基地台，精準推播至覆蓋區域用戶</p>
+                <p className="text-sm text-slate-400 mb-2">系統根據事件位置自動識別影響範圍內的基地台，精準推播至覆蓋區域用戶</p>
+                <p className="text-sm text-amber-400 mb-4">📍 目前事件：{incidentResult?.agent_structured?.situation?.location || incidentResult?.event || ''}</p>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
                   <div className="bg-slate-700/50 rounded-lg p-4">
                     <h3 className="text-sm font-medium text-cyan-400 mb-3">📶 影響範圍基地台</h3>

@@ -27,7 +27,7 @@ function MultiLangReport({ incidentResult }) {
     loadReport()
   }, [])
 
-  // 事件注入後：優先使用 Agent 產出的多語通報
+  // 事件注入後：優先使用 Agent 產出的多語通報，或從事件資料生成
   useEffect(() => {
     if (incidentResult?.agent_structured?.multilang) {
       const agentML = incidentResult.agent_structured.multilang
@@ -45,7 +45,24 @@ function MultiLangReport({ incidentResult }) {
       })
       setLoading(false)
     } else if (incidentResult) {
-      loadReport()
+      // 從事件資料動態生成多語通報（不依賴 Agent multilang）
+      const loc = incidentResult?.agent_structured?.situation?.location || incidentResult?.event?.split('—')?.[0]?.trim() || '事故地點'
+      const desc = incidentResult?.agent_structured?.situation?.description || incidentResult?.event || '交通事件'
+      const alts = incidentResult?.alternative_routes?.map(r => r.path).join('、') || '替代路線'
+      const ete = incidentResult?.ete?.ete_minutes || 60
+      setReport({
+        roaming_rate: 0.35,
+        triggered: true,
+        trigger_station: '大巨蛋站 (BL17)',
+        reports: {
+          zh: `⚠️ ${loc}因${desc}暫時封閉。建議改走${alts}。預計${ete}分鐘後恢復。`,
+          en: `⚠️ ${loc} closed due to incident. Use alternative routes: ${alts}. Est. recovery: ${ete} min.`,
+          ja: `⚠️ ${loc}は事故のため通行止め。${alts}への迂回推奨。復旧予定${ete}分。`,
+          ko: `⚠️ ${loc} 사고로 폐쇄. ${alts}(으)로 우회 권장. 복구 예상 ${ete}분.`,
+        },
+        llm_generated: false,
+      })
+      setLoading(false)
     }
   }, [incidentResult])
 
