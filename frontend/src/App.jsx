@@ -99,6 +99,8 @@ function App() {
   }
 
   const autoProcessedRef = useRef(new Set())
+  const incidentResultRef = useRef(incidentResult)
+  useEffect(() => { incidentResultRef.current = incidentResult }, [incidentResult])
 
   useEffect(() => {
     setOnEvent(async (event) => {
@@ -112,11 +114,9 @@ function App() {
           try {
             const { processIncident } = await import('./services/api')
             const result = await processIncident(inc)
-            // 把舊事件推進歷史，新事件取代
-            setIncidentHistory((h) => {
-              const prev = incidentResult
-              return prev ? [prev, ...h] : h
-            })
+            // 把舊事件推進歷史，新事件取代（用 ref 讀最新值避免 closure stale）
+            const prev = incidentResultRef.current
+            if (prev) setIncidentHistory((h) => [prev, ...h])
             setIncidentResult(result)
           } catch (err) {
             console.error('Auto process incident failed:', err)
@@ -495,18 +495,33 @@ function App() {
                   <div className="bg-slate-700/50 rounded-lg p-4">
                     <h3 className="text-sm font-medium text-cyan-400 mb-3">📶 影響範圍基地台</h3>
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between bg-slate-800 rounded p-2">
-                        <span className="text-sm text-white">BL17 大巨蛋站</span>
-                        <span className="text-xs text-amber-400">28,000 用戶 · 漫遊 35%</span>
-                      </div>
-                      <div className="flex items-center justify-between bg-slate-800 rounded p-2">
-                        <span className="text-sm text-white">BL12 忠孝復興站</span>
-                        <span className="text-xs text-slate-400">22,000 用戶 · 漫遊 18%</span>
-                      </div>
-                      <div className="flex items-center justify-between bg-slate-800 rounded p-2">
-                        <span className="text-sm text-white">R03 信義商圈</span>
-                        <span className="text-xs text-amber-400">35,000 用戶 · 漫遊 38%</span>
-                      </div>
+                      {(() => {
+                        const eventType = incidentResult?.type || incidentResult?.agent_structured?.situation?.event_type || ''
+                        const STATION_MAP = {
+                          road_collapse: [
+                            { id: 'BL17', name: 'BL17 大巨蛋站', users: '28,000', roaming: '35%', highlight: true },
+                            { id: 'BL16', name: 'BL16 忠孝敦化站', users: '19,000', roaming: '12%', highlight: false },
+                            { id: 'BR08', name: 'BR08 光復站', users: '15,000', roaming: '22%', highlight: true },
+                          ],
+                          crowd_surge: [
+                            { id: 'BL14', name: 'BL14 國父紀念館站', users: '42,000', roaming: '45%', highlight: true },
+                            { id: 'BL15', name: 'BL15 市政府站', users: '31,000', roaming: '28%', highlight: true },
+                            { id: 'BL17', name: 'BL17 大巨蛋站', users: '28,000', roaming: '35%', highlight: false },
+                          ],
+                          signal_failure: [
+                            { id: 'R03', name: 'R03 信義商圈', users: '35,000', roaming: '38%', highlight: true },
+                            { id: 'R02', name: 'R02 象山站', users: '12,000', roaming: '8%', highlight: false },
+                            { id: 'BL18', name: 'BL18 永春站', users: '18,000', roaming: '15%', highlight: true },
+                          ],
+                        }
+                        const stations = STATION_MAP[eventType] || STATION_MAP.road_collapse
+                        return stations.map(st => (
+                          <div key={st.id} className="flex items-center justify-between bg-slate-800 rounded p-2">
+                            <span className="text-sm text-white">{st.name}</span>
+                            <span className={`text-xs ${st.highlight ? 'text-amber-400' : 'text-slate-400'}`}>{st.users} 用戶 · 漫遊 {st.roaming}</span>
+                          </div>
+                        ))
+                      })()}
                     </div>
                   </div>
                   <div className="bg-slate-700/50 rounded-lg p-4">
