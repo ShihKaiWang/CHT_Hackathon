@@ -1,122 +1,114 @@
-import { useState } from 'react'
-import ChannelPreview from './ChannelPreview'
+import { useState, useEffect } from 'react'
 
-const CHANNELS = [
-  {
-    id: 'cbs',
-    name: 'Cell Broadcast',
-    icon: '📡',
-    desc: '細胞廣播（強制推播到該區所有手機）',
-    coverage: '基地台範圍 500m',
-    speed: '< 30 秒',
-  },
-  {
-    id: 'sms',
-    name: 'SMS 簡訊',
-    icon: '💬',
-    desc: '發送至信令偵測到的用戶手機',
-    coverage: '已偵測用戶',
-    speed: '< 60 秒',
-  },
-  {
-    id: 'signboard',
-    name: '電子看板 / CMS',
-    icon: '🖥️',
-    desc: '路側電子看板即時更新',
-    coverage: '沿線 12 面看板',
-    speed: '即時',
-  },
-  {
-    id: 'app',
-    name: 'APP 推播',
-    icon: '📱',
-    desc: 'Firebase / APNs 推播通知',
-    coverage: 'APP 用戶 ~15,000',
-    speed: '< 10 秒',
-  },
-  {
-    id: 'navigation',
-    name: '導航平台',
-    icon: '🗺️',
-    desc: 'Google Maps / Apple Maps 路況更新',
-    coverage: '導航用戶',
-    speed: '< 5 分鐘',
-  },
-  {
-    id: 'social',
-    name: '社群廣播',
-    icon: '📢',
-    desc: 'LINE 官方帳號 / X (Twitter)',
-    coverage: '追蹤者 ~80,000',
-    speed: '< 30 秒',
-  },
+// All possible government agencies
+const ALL_AGENCIES = [
+  { id: 'police_traffic', name: '警察局交通大隊', icon: '🚔', desc: '事故處理、交通疏導、封路管制' },
+  { id: 'police', name: '警察局', icon: '👮', desc: '現場封鎖、維安、事故調查' },
+  { id: 'fire_rescue', name: '消防局救護車', icon: '🚑', desc: '傷患救助、緊急送醫' },
+  { id: 'fire_hazmat', name: '消防局 HAZMAT', icon: '☢️', desc: '危險物質處理、除污作業' },
+  { id: 'traffic_bureau', name: '交通局號誌維修組', icon: '🚦', desc: '號誌搶修、時制調整' },
+  { id: 'public_works', name: '工務局搶修組', icon: '🏗️', desc: '路面修復、管線檢查' },
+  { id: 'water_company', name: '自來水公司', icon: '💧', desc: '水管破裂搶修、確認管線' },
+  { id: 'gas_company', name: '瓦斯公司', icon: '🔥', desc: '瓦斯管線安全確認' },
+  { id: 'epa_parks', name: '環保局公園處', icon: '🌳', desc: '路樹移除、清運作業' },
+  { id: 'epa', name: '環保局', icon: '♻️', desc: '環境清淤、污染監測' },
+  { id: 'water_resources', name: '水利處', icon: '🌊', desc: '抽水作業、排水系統' },
+  { id: 'taipower', name: '台電', icon: '⚡', desc: '斷電搶修、電纜修復' },
+  { id: 'mrt', name: '台北捷運公司', icon: '🚇', desc: '加開班次、站務人員增派' },
+  { id: 'bus', name: '公車處', icon: '🚌', desc: '接駁車調度、路線改道' },
+  { id: 'forensics', name: '鑑識組', icon: '🔍', desc: '事故重建、證據採集' },
 ]
 
-function NotificationDispatch({ onDispatch }) {
-  const [selectedChannels, setSelectedChannels] = useState(['cbs', 'sms', 'signboard'])
+function NotificationDispatch({ incidentResult }) {
+  // Agent 推薦的單位（從 incidentResult.agent_structured.dispatch.agencies 取得）
+  const agentRecommended = incidentResult?.agent_structured?.dispatch?.agencies || []
+  const recommendedIds = agentRecommended.map(a => {
+    // 從名稱匹配到 ID
+    const match = ALL_AGENCIES.find(ag => a.name.includes(ag.name) || ag.name.includes(a.name))
+    return match?.id || ''
+  }).filter(Boolean)
+
+  const [selectedAgencies, setSelectedAgencies] = useState([])
   const [dispatching, setDispatching] = useState(false)
   const [dispatched, setDispatched] = useState(false)
-  const [showPreview, setShowPreview] = useState(false)
 
-  function toggleChannel(id) {
-    setSelectedChannels((prev) =>
-      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
+  // 當 Agent 推薦更新時，自動勾選
+  useEffect(() => {
+    if (recommendedIds.length > 0) {
+      setSelectedAgencies(recommendedIds)
+    }
+  }, [incidentResult])
+
+  function toggleAgency(id) {
+    setSelectedAgencies(prev =>
+      prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]
     )
   }
 
-  async function handleDispatch() {
-    if (selectedChannels.length === 0) return
+  function handleDispatch() {
+    if (selectedAgencies.length === 0) return
     setDispatching(true)
-    setDispatched(false)
-
-    // 模擬逐步發送
-    await new Promise((r) => setTimeout(r, 2000))
-    setDispatching(false)
-    setDispatched(true)
-    setShowPreview(true) // 發送後自動跳出預覽
-
-    if (onDispatch) {
-      onDispatch(selectedChannels)
-    }
+    setTimeout(() => {
+      setDispatching(false)
+      setDispatched(true)
+    }, 2000)
   }
 
-  return (
-    <div className="bg-slate-800 rounded-lg p-6">
-      <h2 className="text-lg font-semibold text-white mb-2">📤 通知發送管道</h2>
-      <p className="text-xs text-slate-400 mb-4">
-        選擇要啟用的通知管道，系統將同步發送多語通報至所有選定管道
-      </p>
+  const signalAdj = incidentResult?.agent_structured?.dispatch?.signal_adjustment
+  const handlingTime = incidentResult?.agent_structured?.dispatch?.handling_time
 
-      {/* 管道選擇 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-        {CHANNELS.map((ch) => {
-          const selected = selectedChannels.includes(ch.id)
+  return (
+    <div className="card-glass rounded-lg p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-semibold text-white">📞 公務單位通報派遣</h2>
+          <p className="text-sm text-slate-400 mt-1">AI Agent 已根據事故類型自動判定應通報單位，請確認後送出</p>
+        </div>
+        {dispatched && (
+          <span className="text-xs px-3 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded-lg">✅ 已通報</span>
+        )}
+      </div>
+
+      {/* Agent 推薦提示 */}
+      {agentRecommended.length > 0 && !dispatched && (
+        <div className="mb-4 p-3 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
+          <p className="text-sm text-cyan-400">🤖 AI Agent 建議通報以下 {agentRecommended.length} 個單位（已自動勾選）</p>
+        </div>
+      )}
+
+      {/* Agency Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+        {ALL_AGENCIES.map(agency => {
+          const selected = selectedAgencies.includes(agency.id)
+          const isRecommended = recommendedIds.includes(agency.id)
           return (
             <button
-              key={ch.id}
-              onClick={() => toggleChannel(ch.id)}
+              key={agency.id}
+              onClick={() => toggleAgency(agency.id)}
+              disabled={dispatched}
               className={`p-3 rounded-lg border text-left transition-all ${
                 selected
-                  ? 'border-blue-500 bg-blue-500/15 ring-1 ring-blue-500/30'
+                  ? isRecommended
+                    ? 'border-cyan-500 bg-cyan-500/15 ring-1 ring-cyan-500/30'
+                    : 'border-blue-500 bg-blue-500/15 ring-1 ring-blue-500/30'
                   : 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
-              }`}
+              } ${dispatched ? 'opacity-60 cursor-not-allowed' : ''}`}
             >
-              <div className="flex items-center gap-2">
-                <span className="text-xl">{ch.icon}</span>
+              <div className="flex items-start gap-2">
+                <span className="text-xl">{agency.icon}</span>
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-white">{ch.name}</span>
+                    <span className="text-sm font-medium text-white">{agency.name}</span>
                     <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-                      selected ? 'border-blue-500 bg-blue-500' : 'border-slate-500'
+                      selected ? 'border-cyan-500 bg-cyan-500' : 'border-slate-500'
                     }`}>
                       {selected && <span className="text-white text-xs">✓</span>}
                     </div>
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">{ch.desc}</p>
-                  <div className="flex gap-3 mt-1 text-xs text-slate-500">
-                    <span>覆蓋：{ch.coverage}</span>
-                    <span>速度：{ch.speed}</span>
-                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">{agency.desc}</p>
+                  {isRecommended && (
+                    <span className="text-xs text-cyan-400 mt-1 inline-block">🤖 AI 推薦</span>
+                  )}
                 </div>
               </div>
             </button>
@@ -124,50 +116,33 @@ function NotificationDispatch({ onDispatch }) {
         })}
       </div>
 
-      {/* 發送按鈕 */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={handleDispatch}
-          disabled={selectedChannels.length === 0 || dispatching}
-          className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all shadow-lg shadow-blue-500/20"
-        >
-          {dispatching
-            ? '⏳ 正在發送中...'
-            : dispatched
-            ? '✅ 重新發送'
-            : `🚀 發送通報（${selectedChannels.length} 個管道）`}
-        </button>
-        <button
-          onClick={() => setShowPreview(true)}
-          disabled={selectedChannels.length === 0}
-          className="px-4 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all"
-          title="預覽各管道呈現方式"
-        >
-          👁️ 預覽
-        </button>
-        {dispatched && (
-          <span className="text-sm text-green-400 animate-pulse">已成功送出</span>
-        )}
-      </div>
-
-      {/* 管道預覽 Modal */}
-      {showPreview && (
-        <ChannelPreview
-          selectedChannels={selectedChannels}
-          onClose={() => setShowPreview(false)}
-        />
+      {/* Signal Adjustment */}
+      {signalAdj && (
+        <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+          <h3 className="text-sm font-medium text-amber-400 mb-2">🚦 號誌調整建議</h3>
+          <p className="text-sm text-amber-300">{signalAdj.action}</p>
+          <div className="flex gap-4 mt-2 text-xs text-slate-400">
+            <span>持續：{signalAdj.duration}</span>
+            {handlingTime && <span>預估處理：{handlingTime}</span>}
+          </div>
+        </div>
       )}
 
-      {/* 選取摘要 */}
-      {selectedChannels.length > 0 && (
-        <div className="mt-4 p-3 bg-slate-700/50 rounded-lg">
-          <p className="text-xs text-slate-300">
-            <span className="text-slate-400">已選擇管道：</span>
-            {selectedChannels.map((id) => {
-              const ch = CHANNELS.find((c) => c.id === id)
-              return ` ${ch.icon} ${ch.name}`
-            }).join('、')}
-          </p>
+      {/* Dispatch Button */}
+      {!dispatched ? (
+        <button
+          onClick={handleDispatch}
+          disabled={selectedAgencies.length === 0 || dispatching}
+          className="w-full py-4 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed text-white font-bold text-lg rounded-lg transition-all shadow-lg shadow-indigo-500/20"
+        >
+          {dispatching
+            ? '⏳ 正在通報各單位...'
+            : `🚀 確認通報（${selectedAgencies.length} 個單位）`}
+        </button>
+      ) : (
+        <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg text-center">
+          <p className="text-lg text-green-400 font-medium">✅ 已成功通報 {selectedAgencies.length} 個單位</p>
+          <p className="text-sm text-slate-400 mt-1">各單位已收到通知並啟動應變程序</p>
         </div>
       )}
     </div>

@@ -503,7 +503,7 @@ function App() {
                 </div>
               </div>
             )}
-            {incidentResult && <NotificationDispatch />}
+            {incidentResult && <NotificationDispatch incidentResult={incidentResult} />}
             <MultiLangReport incidentResult={incidentResult} />
             {/* 事件產出的民眾通報（從事件應變帶過來） */}
             {incidentResult && incidentResult.llm_guidance && (
