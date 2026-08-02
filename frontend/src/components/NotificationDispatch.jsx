@@ -80,9 +80,6 @@ function NotificationDispatch({ incidentResult }) {
     setDispatched(true)
   }
 
-  const signalAdj = incidentResult?.agent_structured?.dispatch?.signal_adjustment
-  const handlingTime = incidentResult?.agent_structured?.dispatch?.handling_time
-
   return (
     <div className="card-glass rounded-lg p-6">
       <div className="flex items-center justify-between mb-4">
