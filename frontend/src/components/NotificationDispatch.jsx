@@ -22,9 +22,20 @@ const ALL_AGENCIES = [
 function NotificationDispatch({ incidentResult }) {
   // Agent 推薦的單位（從 incidentResult.agent_structured.dispatch.agencies 取得）
   const agentRecommended = incidentResult?.agent_structured?.dispatch?.agencies || []
+  const incidentType = incidentResult?.agent_structured?.dispatch?.incident_type || incidentResult?.agent_structured?.situation?.event_type || ''
+  const signalAdj = incidentResult?.agent_structured?.dispatch?.signal_adjustment
+  const handlingTime = incidentResult?.agent_structured?.dispatch?.handling_time
+  const eventLocation = incidentResult?.agent_structured?.situation?.location || incidentResult?.event?.split('—')?.[0]?.trim() || '事故地點'
+  const eventDesc = incidentResult?.agent_structured?.situation?.description || incidentResult?.event || ''
+
+  // 寬鬆匹配：只要 agent name 的任何部分包含在 ALL_AGENCIES name 裡（或反過來）
   const recommendedIds = agentRecommended.map(a => {
-    // 從名稱匹配到 ID
-    const match = ALL_AGENCIES.find(ag => a.name.includes(ag.name) || ag.name.includes(a.name))
+    const agentName = a.name || ''
+    const match = ALL_AGENCIES.find(ag => {
+      const n1 = agentName.replace(/\s/g, '')
+      const n2 = ag.name.replace(/\s/g, '')
+      return n1.includes(n2) || n2.includes(n1) || n1.slice(0, 3) === n2.slice(0, 3)
+    })
     return match?.id || ''
   }).filter(Boolean)
 
@@ -143,8 +154,8 @@ function NotificationDispatch({ incidentResult }) {
               const eventDesc = incidentResult?.agent_structured?.situation?.description || incidentResult?.event || '交通事件'
               const location = incidentResult?.agent_structured?.situation?.location || '台北市'
               const msg = agentInfo
-                ? `【緊急通報】${location}發生${eventDesc}。請貴單位執行：${agentInfo.action}。預估處理時間：${handlingTime || 'N/A'}。`
-                : `【緊急通報】${location}發生${eventDesc}。請貴單位依權責協助處理。`
+                ? `【緊急通報 — ${incidentType || '交通事故'}】\n地點：${eventLocation}\n事故描述：${eventDesc}\n請貴單位立即執行：${agentInfo.action}\n號誌調整：${signalAdj?.action || '依現場狀況調整'}\n預估處理時間：${handlingTime || 'N/A'}\n通報層級：${agentInfo.priority || 'P0'}`
+                : `【緊急通報 — ${incidentType || '交通事故'}】\n地點：${eventLocation}\n事故描述：${eventDesc}\n請貴單位依權責協助處理。`
               return (
                 <div key={agencyId} className="bg-slate-800 rounded p-2">
                   <div className="flex items-center gap-2 mb-1">
