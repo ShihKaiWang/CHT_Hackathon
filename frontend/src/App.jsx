@@ -415,6 +415,56 @@ function App() {
         {/* ===== 3. 通報發佈 ===== */}
         {activeTab === 'notify' && (
           <div className="space-y-6">
+            {/* 發送對象篩選 */}
+            {incidentResult && (
+              <div className="card-glass rounded-lg p-6">
+                <h2 className="text-lg font-semibold text-white mb-3">📡 發送對象篩選（地理圍欄）</h2>
+                <p className="text-sm text-slate-400 mb-4">系統根據事件位置自動識別影響範圍內的基地台，精準推播至覆蓋區域用戶</p>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                  <div className="bg-slate-700/50 rounded-lg p-4">
+                    <h3 className="text-sm font-medium text-cyan-400 mb-3">📶 影響範圍基地台</h3>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between bg-slate-800 rounded p-2">
+                        <span className="text-sm text-white">BL17 大巨蛋站</span>
+                        <span className="text-xs text-amber-400">28,000 用戶 · 漫遊 35%</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-slate-800 rounded p-2">
+                        <span className="text-sm text-white">BL12 忠孝復興站</span>
+                        <span className="text-xs text-slate-400">22,000 用戶 · 漫遊 18%</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-slate-800 rounded p-2">
+                        <span className="text-sm text-white">R03 信義商圈</span>
+                        <span className="text-xs text-amber-400">35,000 用戶 · 漫遊 38%</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-slate-700/50 rounded-lg p-4">
+                    <h3 className="text-sm font-medium text-green-400 mb-3">📊 推播統計</h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-300">總觸及用戶</span>
+                        <span className="text-lg font-bold text-white">85,000</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-300">本國用戶（中文 CBS）</span>
+                        <span className="text-sm font-bold text-cyan-400">~59,000</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-300">漫遊用戶（多語推播）</span>
+                        <span className="text-sm font-bold text-amber-400">~26,000</span>
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-600">
+                        <span className="text-sm text-slate-300">真實 SMS 發送</span>
+                        <span className="text-sm font-bold text-green-400">3 支指揮官手機 ✅</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                  <p className="text-sm text-blue-300">💡 正式環境接入中華電信 CBS Gateway 後，可精準推播至基地台覆蓋範圍內所有手機（無需安裝 APP）。Demo 中透過 AWS SNS 真實發送 SMS 至指揮團隊手機展示。</p>
+                </div>
+              </div>
+            )}
             <MultiLangReport incidentResult={incidentResult} />
             {/* 事件產出的民眾通報（從事件應變帶過來） */}
             {incidentResult && incidentResult.llm_guidance && (
