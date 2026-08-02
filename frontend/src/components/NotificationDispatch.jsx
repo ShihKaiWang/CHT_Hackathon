@@ -128,6 +128,37 @@ function NotificationDispatch({ incidentResult }) {
         </div>
       )}
 
+      {/* 通報訊息預覽 */}
+      {selectedAgencies.length > 0 && !dispatched && (
+        <div className="mb-4 p-4 bg-slate-700/30 border border-slate-600 rounded-lg">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-medium text-white">📝 通報訊息預覽</h3>
+            <span className="text-xs text-slate-400">AI Agent 自動生成 · 可編輯</span>
+          </div>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {selectedAgencies.map(agencyId => {
+              const agency = ALL_AGENCIES.find(a => a.id === agencyId)
+              if (!agency) return null
+              const agentInfo = agentRecommended.find(a => a.name.includes(agency.name) || agency.name.includes(a.name))
+              const eventDesc = incidentResult?.agent_structured?.situation?.description || incidentResult?.event || '交通事件'
+              const location = incidentResult?.agent_structured?.situation?.location || '台北市'
+              const msg = agentInfo
+                ? `【緊急通報】${location}發生${eventDesc}。請貴單位執行：${agentInfo.action}。預估處理時間：${handlingTime || 'N/A'}。`
+                : `【緊急通報】${location}發生${eventDesc}。請貴單位依權責協助處理。`
+              return (
+                <div key={agencyId} className="bg-slate-800 rounded p-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm">{agency.icon}</span>
+                    <span className="text-xs text-white font-medium">{agency.name}</span>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">{msg}</p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Dispatch Button */}
       {!dispatched ? (
         <button

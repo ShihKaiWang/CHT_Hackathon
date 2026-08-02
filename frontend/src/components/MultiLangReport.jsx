@@ -215,7 +215,6 @@ function MultiLangReport({ incidentResult }) {
 
       {/* === 第三排：通知發送管道 + 發送狀態 === */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <NotificationDispatch onDispatch={handleDispatch} />
         <DispatchStatus dispatchedChannels={dispatchedChannels} />
       </div>
 
