@@ -387,6 +387,43 @@ function App() {
                 <AlertList />
               </div>
             </div>
+
+            {/* 通報派遣狀態（事件發生後顯示） */}
+            {incidentResult?.agent_structured?.dispatch && (
+              <div className="card-glass rounded-lg p-6 border border-indigo-500/30">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-white">📞 通報派遣狀態</h2>
+                  <span className="text-xs px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded-lg animate-pulse">即時通報中</span>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  {/* 通報單位 */}
+                  <div className="lg:col-span-2">
+                    <p className="text-sm text-slate-400 mb-2">已通報單位：</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {incidentResult.agent_structured.dispatch.agencies?.map((agency, i) => (
+                        <div key={i} className="flex items-center gap-2 bg-slate-700/50 rounded-lg p-3">
+                          <span className={`px-2 py-0.5 rounded text-xs font-bold ${agency.priority === 'P0' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'}`}>{agency.priority}</span>
+                          <div>
+                            <p className="text-sm text-white font-medium">{agency.name}</p>
+                            <p className="text-xs text-slate-400">{agency.action}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {/* 號誌調整 */}
+                  <div>
+                    <p className="text-sm text-slate-400 mb-2">號誌調整：</p>
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+                      <p className="text-sm text-amber-300">{incidentResult.agent_structured.dispatch.signal_adjustment?.action}</p>
+                      <p className="text-xs text-slate-400 mt-2">持續時間：{incidentResult.agent_structured.dispatch.signal_adjustment?.duration}</p>
+                      <p className="text-xs text-slate-400 mt-1">預估處理：{incidentResult.agent_structured.dispatch.handling_time}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <CrowdDensityChart />
             <ProactiveAlert />
           </div>
