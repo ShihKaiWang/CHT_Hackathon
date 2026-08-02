@@ -38,6 +38,7 @@ TOOLS = [
     {"toolSpec": {"name": "get_live_incidents", "description": "查詢即時事件清單。", "inputSchema": {"json": {"type": "object", "properties": {}, "required": []}}}},
     {"toolSpec": {"name": "classify_traffic_level", "description": "根據飽和度判定級別：A級>=0.95、B級>=0.85。", "inputSchema": {"json": {"type": "object", "properties": {"saturation_score": {"type": "number", "description": "飽和度(0-1)"}}, "required": ["saturation_score"]}}}},
     {"toolSpec": {"name": "generate_multilang_alert", "description": "產出中英日韓四語緊急通報。", "inputSchema": {"json": {"type": "object", "properties": {"incident_description": {"type": "string", "description": "事件描述"}, "location": {"type": "string", "description": "位置"}, "alternative_routes": {"type": "string", "description": "替代路線"}}, "required": ["incident_description", "location"]}}}},
+    {"toolSpec": {"name": "dispatch_to_agency", "description": "根據事故類型通報對應單位並建議號誌調整。回傳通報單位清單、號誌建議、預估處理時間。", "inputSchema": {"json": {"type": "object", "properties": {"incident_type": {"type": "string", "description": "事故類型：car_accident_minor/car_accident_major/road_collapse/fallen_tree/signal_failure/flooding/mass_event/hazmat_spill/construction/power_line_down"}, "location": {"type": "string", "description": "事故地點"}, "severity": {"type": "string", "description": "嚴重度：Critical/High/Medium/Low"}}, "required": ["incident_type", "location"]}}}},
 ]
 
 
@@ -141,6 +142,110 @@ def _execute_tool(tool_name: str, tool_input: dict) -> str:
             return json.dumps(result, ensure_ascii=False)
         return json.dumps({"zh": f"⚠️ {loc}因{desc}封閉，請改走{alts or '替代路線'}。", "en": f"⚠️ {loc} closed. Use alternatives.", "ja": f"⚠️ {loc}通行止め。", "ko": f"⚠️ {loc} 폐쇄."}, ensure_ascii=False)
 
+    elif tool_name == "dispatch_to_agency":
+        incident_type = tool_input.get("incident_type", "")
+        location = tool_input.get("location", "")
+        severity = tool_input.get("severity", "High")
+        
+        DISPATCH_MATRIX = {
+            "car_accident_minor": {
+                "agencies": [{"name": "警察局交通大隊", "action": "到場處理事故、疏導交通", "priority": "P0"}],
+                "signal": {"action": "事故路口切黃閃燈，鄰近路口綠燈延長 +15%", "duration": "20 分鐘"},
+                "ete": 20,
+            },
+            "car_accident_major": {
+                "agencies": [
+                    {"name": "警察局", "action": "封鎖現場、事故調查", "priority": "P0"},
+                    {"name": "消防局救護車", "action": "傷患救助、送醫", "priority": "P0"},
+                    {"name": "鑑識組", "action": "事故重建（如有傷亡）", "priority": "P1"},
+                ],
+                "signal": {"action": "封閉事故路段，替代路線綠燈延長 +30%，上游路口引導改道", "duration": "60 分鐘"},
+                "ete": 60,
+            },
+            "road_collapse": {
+                "agencies": [
+                    {"name": "工務局搶修組", "action": "路面修復、管線檢查", "priority": "P0"},
+                    {"name": "警察局", "action": "封路管制、交通疏導", "priority": "P0"},
+                    {"name": "自來水公司", "action": "確認管線狀態", "priority": "P1"},
+                    {"name": "瓦斯公司", "action": "確認瓦斯管線安全", "priority": "P1"},
+                ],
+                "signal": {"action": "封閉雙向車道，周邊 3 個路口全面重配時相，替代幹道綠燈 +40%", "duration": "120+ 分鐘"},
+                "ete": 120,
+            },
+            "fallen_tree": {
+                "agencies": [
+                    {"name": "環保局公園處", "action": "樹木移除、清運", "priority": "P0"},
+                    {"name": "警察局", "action": "現場管制、引導車輛", "priority": "P0"},
+                ],
+                "signal": {"action": "佔用車道方向紅燈延長 +10s，對向綠燈延長 +20%", "duration": "30 分鐘"},
+                "ete": 30,
+            },
+            "signal_failure": {
+                "agencies": [
+                    {"name": "交通局號誌維修組", "action": "緊急搶修號誌設備", "priority": "P0"},
+                    {"name": "警察局", "action": "路口手動指揮交通", "priority": "P0"},
+                ],
+                "signal": {"action": "故障路口切閃光黃燈模式，鄰近路口綠燈補償 +15%", "duration": "45 分鐘"},
+                "ete": 45,
+            },
+            "flooding": {
+                "agencies": [
+                    {"name": "水利處", "action": "抽水作業", "priority": "P0"},
+                    {"name": "警察局", "action": "封閉積水路段", "priority": "P0"},
+                    {"name": "環保局", "action": "清淤、環境復原", "priority": "P1"},
+                ],
+                "signal": {"action": "封閉低窪路段，高架道路/替代路線綠燈延長 +25%", "duration": "60 分鐘"},
+                "ete": 60,
+            },
+            "mass_event": {
+                "agencies": [
+                    {"name": "警察局", "action": "人潮管制、維安", "priority": "P0"},
+                    {"name": "台北捷運公司", "action": "加開班次、站務人員增派", "priority": "P0"},
+                    {"name": "公車處", "action": "接駁車調度", "priority": "P1"},
+                ],
+                "signal": {"action": "場館周邊出場方向綠燈 +40%，入場方向紅燈延長，持續 30 分鐘", "duration": "30 分鐘"},
+                "ete": 30,
+            },
+            "hazmat_spill": {
+                "agencies": [
+                    {"name": "消防局 HAZMAT 小組", "action": "危險物質處理、除污", "priority": "P0"},
+                    {"name": "警察局", "action": "封鎖 500m 範圍、全面管制", "priority": "P0"},
+                    {"name": "環保局", "action": "環境監測、善後處理", "priority": "P0"},
+                ],
+                "signal": {"action": "封鎖半徑 500m 所有路口，全面改道，遠端路口引導繞行", "duration": "180+ 分鐘"},
+                "ete": 180,
+            },
+            "construction": {
+                "agencies": [
+                    {"name": "交通局", "action": "確認施工許可、協調施工方", "priority": "P1"},
+                    {"name": "警察局", "action": "施工區交通引導", "priority": "P1"},
+                ],
+                "signal": {"action": "佔用車道方向紅燈延長 +10s，確保施工安全間距", "duration": "依施工期程"},
+                "ete": 0,
+            },
+            "power_line_down": {
+                "agencies": [
+                    {"name": "台電", "action": "斷電搶修、電纜修復", "priority": "P0"},
+                    {"name": "消防局", "action": "現場安全警戒（觸電風險）", "priority": "P0"},
+                    {"name": "警察局", "action": "封路管制、絕對禁止通行", "priority": "P0"},
+                ],
+                "signal": {"action": "封閉該路段雙向，絕對不可通行，鄰近路口全紅 30 秒後引導改道", "duration": "90 分鐘"},
+                "ete": 90,
+            },
+        }
+        
+        dispatch_info = DISPATCH_MATRIX.get(incident_type, DISPATCH_MATRIX.get("car_accident_minor"))
+        result = {
+            "incident_type": incident_type,
+            "location": location,
+            "severity": severity,
+            "dispatch_agencies": dispatch_info["agencies"],
+            "signal_adjustment": dispatch_info["signal"],
+            "estimated_handling_time": f"{dispatch_info['ete']} 分鐘" if dispatch_info['ete'] > 0 else "依期程",
+            "sop_reference": "SOP 第 2 條（事故應變）+ 第 5 條（號誌異常）",
+        }
+        return json.dumps(result, ensure_ascii=False)
+
     return json.dumps({"error": f"Unknown tool: {tool_name}"})
 
 
@@ -180,6 +285,24 @@ SYSTEM_PROMPT = """你是「城市應變分析 AI Agent」，一個智慧交通�
 - 排除飽和度 >= 0.85 的路段（SOP 第 1 條）
 - 排除容量 < 1000 vph 的路段（SOP 第 2 條）
 - 說明每條被排除路線的原因
+
+## 事故分類與通報規則
+當偵測到事故時，你必須：
+1. 判定事故類型（car_accident_minor/car_accident_major/road_collapse/fallen_tree/signal_failure/flooding/mass_event/hazmat_spill/construction/power_line_down）
+2. 呼叫 dispatch_to_agency 工具取得通報單位和號誌建議
+3. 在回答中明確列出：要通知哪些單位、號誌如何調整、預估處理時間
+
+事故類型對照：
+- 輕微車禍 → 警察局交通大隊
+- 重大車禍（傷亡）→ 警察局 + 消防局救護車 + 鑑識組
+- 路面塌陷 → 工務局 + 警察局 + 自來水/瓦斯公司
+- 路樹倒塌 → 環保局公園處 + 警察局
+- 號誌故障 → 交通局維修組 + 警察局（手動指揮）
+- 淹水積水 → 水利處 + 警察局 + 環保局
+- 大型活動散場 → 警察局 + 捷運公司 + 公車處
+- 危險物品洩漏 → 消防局 HAZMAT + 警察局 + 環保局
+- 施工佔道 → 交通局 + 警察局
+- 電纜掉落 → 台電 + 消防局 + 警察局
 
 ## 注意
 - 不要編造數據，所有數值必須用工具查詢
