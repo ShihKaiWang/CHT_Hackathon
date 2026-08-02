@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import axios from 'axios'
 
 // All possible government agencies
 const ALL_AGENCIES = [
@@ -56,13 +57,27 @@ function NotificationDispatch({ incidentResult }) {
     )
   }
 
-  function handleDispatch() {
+  async function handleDispatch() {
     if (selectedAgencies.length === 0) return
     setDispatching(true)
-    setTimeout(() => {
-      setDispatching(false)
-      setDispatched(true)
-    }, 2000)
+
+    // 組合通報訊息
+    const agencyNames = selectedAgencies.map(id => ALL_AGENCIES.find(a => a.id === id)?.name || id)
+    const message = `【緊急通報 — ${incidentType || '交通事故'}】\n地點：${eventLocation}\n事故描述：${eventDesc}\n號誌調整：${signalAdj?.action || '依現場狀況'}\n預估處理：${handlingTime || 'N/A'}`
+
+    try {
+      await axios.post('/api/incidents/dispatch-agencies', {
+        agencies: agencyNames,
+        message,
+        incident_type: incidentType,
+        location: eventLocation,
+      })
+    } catch (err) {
+      console.error('Dispatch error:', err)
+    }
+
+    setDispatching(false)
+    setDispatched(true)
   }
 
   const signalAdj = incidentResult?.agent_structured?.dispatch?.signal_adjustment

@@ -48,6 +48,39 @@ def handle_incident(req: IncidentRequest, user: dict = Depends(require_commander
     return result
 
 
+@router.post("/dispatch-agencies")
+def dispatch_agencies(request_body: dict):
+    """POST /api/incidents/dispatch-agencies — 通報公務單位（真實發送 SMS + LINE + Email）"""
+    agencies = request_body.get("agencies", [])
+    message = request_body.get("message", "")
+    incident_type = request_body.get("incident_type", "交通事故")
+    location = request_body.get("location", "")
+
+    if not agencies or not message:
+        return {"success": False, "error": "Missing agencies or message"}
+
+    full_message = (
+        f"[城市應變 AI Agent — 公務單位通報]\n"
+        f"{'=' * 30}\n"
+        f"事故類型：{incident_type}\n"
+        f"事故地點：{location}\n"
+        f"通報單位：{', '.join(agencies)}\n"
+        f"{'=' * 30}\n\n"
+        f"{message}\n\n"
+        f"請相關單位立即啟動應變程序。\n"
+        f"Dashboard：https://d29bomxt4wi5pg.cloudfront.net"
+    )
+
+    try:
+        from services.aws_services import send_alert_notification, send_line_notify
+        subject = f"[通報] {incident_type} — {location}"
+        sns_ok = send_alert_notification(subject, full_message)
+        line_ok = send_line_notify(f"\n📞 公務單位通報\n━━━━━━━━━━━━━━━\n事故：{incident_type}\n地點：{location}\n通報：{', '.join(agencies)}\n━━━━━━━━━━━━━━━\n{message[:200]}")
+        return {"success": True, "sns": sns_ok, "line": line_ok, "agencies_count": len(agencies)}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 @router.post("/report")
 def handle_report(req: ReportRequest, user: dict = Depends(require_commander)):
     """POST /api/incidents/report — 生成建議書（需指揮官權限）"""
